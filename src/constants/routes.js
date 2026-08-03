@@ -5,6 +5,7 @@ export const ROUTES = {
   LOGIN: 'Login',
   REGISTER: 'Register',
   OTP: 'OTP',
+  FORGOT_PASSWORD: 'ForgotPassword',
 
   // Main tabs
   MAIN_TABS: 'MainTabs',

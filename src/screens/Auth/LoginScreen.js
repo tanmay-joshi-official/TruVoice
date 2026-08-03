@@ -23,8 +23,8 @@ export default function LoginScreen() {
   const navigation = useNavigation();
   const { login, loginAsGuest, isLoading } = useAuthStore();
 
-  const [email, setEmail] = useState('you@truvoice.app');
-  const [password, setPassword] = useState('password123');
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState('');
 
@@ -90,7 +90,7 @@ export default function LoginScreen() {
           </View>
 
           <Pressable
-            onPress={() => {}}
+            onPress={() => navigation.navigate(ROUTES.FORGOT_PASSWORD)}
             className="-mt-1 self-end active:opacity-70"
           >
             <Text className="text-sm font-medium text-primary">

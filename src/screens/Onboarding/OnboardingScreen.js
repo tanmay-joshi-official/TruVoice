@@ -94,11 +94,6 @@ export default function OnboardingScreen() {
           icon={isLastSlide ? undefined : 'arrow-right'}
           className="mt-8"
         />
-        {!isLastSlide && (
-          <View className="pointer-events-none absolute bottom-[74px] left-10">
-            <MaterialCommunityIcons name="arrow-right" size={0} color="transparent" />
-          </View>
-        )}
       </View>
     </ScreenContainer>
   );

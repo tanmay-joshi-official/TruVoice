@@ -8,16 +8,114 @@ export const useAuthStore = create((set) => ({
   isLoading: false,
   hasOnboarded: false,
 
-  setUser: (user) => set({ user, isAuthenticated: !!user }),
+  setLoading: (loading) => set({ isLoading: loading }),
+
+  setHasOnboarded: (value) =>
+    set({
+      hasOnboarded: value,
+    }),
+
+  setUser: (user) =>
+    set({
+      user,
+      isAuthenticated: !!user,
+    }),
+
   setToken: (token) => {
     setAuthToken(token);
-    set({ token, isAuthenticated: !!token });
+
+    set({
+      token,
+      isAuthenticated: !!token,
+    });
   },
-  setLoading: (isLoading) => set({ isLoading }),
-  setHasOnboarded: (hasOnboarded) => set({ hasOnboarded }),
+
+  login: async ({ email }) => {
+    set({ isLoading: true });
+
+    await new Promise((resolve) => setTimeout(resolve, 1200));
+
+    const token = 'demo_token';
+
+    setAuthToken(token);
+
+    set({
+      token,
+      isAuthenticated: true,
+      isLoading: false,
+      user: {
+        id: '1',
+        name: 'Tanmay',
+        email,
+        avatar: null,
+      },
+    });
+  },
+
+  register: async ({ name, email }) => {
+    set({ isLoading: true });
+
+    await new Promise((resolve) => setTimeout(resolve, 1200));
+
+    set({
+      isLoading: false,
+      pendingUser: {
+        name,
+        email,
+      },
+    });
+
+    return true;
+  },
+
+  verifyOTP: async () => {
+    set({ isLoading: true });
+
+    await new Promise((resolve) => setTimeout(resolve, 1000));
+
+    const token = 'demo_token';
+
+    setAuthToken(token);
+
+    set({
+      token,
+      isAuthenticated: true,
+      isLoading: false,
+      user: {
+        id: '1',
+        name: 'Tanmay',
+        email: 'you@truvoice.app',
+      },
+    });
+
+    return true;
+  },
+
+  loginAsGuest: async () => {
+    set({ isLoading: true });
+
+    await new Promise((resolve) => setTimeout(resolve, 800));
+
+    set({
+      isLoading: false,
+      isAuthenticated: true,
+      token: 'guest_token',
+      user: {
+        id: 'guest',
+        name: 'Guest User',
+        email: null,
+      },
+    });
+  },
+
   logout: () => {
     setAuthToken(null);
-    set({ user: null, token: null, isAuthenticated: false });
+
+    set({
+      token: null,
+      user: null,
+      isAuthenticated: false,
+    });
   },
 }));
 
