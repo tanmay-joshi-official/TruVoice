@@ -41,66 +41,68 @@ export default function GlassTabBar({ state, descriptors, navigation }) {
 
   return (
     <View style={[styles.container, { bottom: bottomPosition }]} pointerEvents="box-none">
-      <BlurView intensity={Platform.OS === 'ios' ? 40 : 80} tint="dark" style={styles.blurContainer}>
-        <View style={styles.tabBarInner}>
-          {state.routes.map((route, index) => {
-            const { options } = descriptors[route.key];
-            const isFocused = state.index === index;
+      <View style={styles.tabBarWrapper}>
+        <BlurView intensity={Platform.OS === 'ios' ? 40 : 80} tint="dark" style={styles.blurContainer}>
+          <View style={styles.tabBarInner}>
+            {state.routes.map((route, index) => {
+              const { options } = descriptors[route.key];
+              const isFocused = state.index === index;
 
-            const onPress = () => {
-              const event = navigation.emit({
-                type: 'tabPress',
-                target: route.key,
-                canPreventDefault: true,
-              });
+              const onPress = () => {
+                const event = navigation.emit({
+                  type: 'tabPress',
+                  target: route.key,
+                  canPreventDefault: true,
+                });
 
-              if (!isFocused && !event.defaultPrevented) {
-                navigation.navigate(route.name);
-              }
-            };
+                if (!isFocused && !event.defaultPrevented) {
+                  navigation.navigate(route.name);
+                }
+              };
 
-            const onLongPress = () => {
-              navigation.emit({
-                type: 'tabLongPress',
-                target: route.key,
-              });
-            };
+              const onLongPress = () => {
+                navigation.emit({
+                  type: 'tabLongPress',
+                  target: route.key,
+                });
+              };
 
-            const iconName = getIconName(route.name, isFocused);
-            const label = getLabel(route.name);
+              const iconName = getIconName(route.name, isFocused);
+              const label = getLabel(route.name);
 
-            return (
-              <TouchableOpacity
-                key={route.key}
-                accessibilityRole="button"
-                accessibilityState={isFocused ? { selected: true } : {}}
-                accessibilityLabel={options.tabBarAccessibilityLabel}
-                testID={options.tabBarTestID}
-                onPress={onPress}
-                onLongPress={onLongPress}
-                activeOpacity={0.7}
-                style={styles.tabItem}
-              >
-                <View style={[styles.iconWrapper, isFocused && styles.activeIconWrapper]}>
-                  <Ionicons
-                    name={iconName}
-                    size={20}
-                    color={isFocused ? '#60A5FA' : colors.textMuted}
-                  />
-                  <Text
-                    style={[
-                      styles.tabLabel,
-                      { color: isFocused ? '#60A5FA' : colors.textMuted, fontWeight: isFocused ? '600' : '400' },
-                    ]}
-                  >
-                    {label}
-                  </Text>
-                </View>
-              </TouchableOpacity>
-            );
-          })}
-        </View>
-      </BlurView>
+              return (
+                <TouchableOpacity
+                  key={route.key}
+                  accessibilityRole="button"
+                  accessibilityState={isFocused ? { selected: true } : {}}
+                  accessibilityLabel={options.tabBarAccessibilityLabel}
+                  testID={options.tabBarTestID}
+                  onPress={onPress}
+                  onLongPress={onLongPress}
+                  activeOpacity={0.7}
+                  style={styles.tabItem}
+                >
+                  <View style={[styles.iconWrapper, isFocused && styles.activeIconWrapper]}>
+                    <Ionicons
+                      name={iconName}
+                      size={20}
+                      color={isFocused ? '#60A5FA' : colors.textMuted}
+                    />
+                    <Text
+                      style={[
+                        styles.tabLabel,
+                        { color: isFocused ? '#60A5FA' : colors.textMuted, fontWeight: isFocused ? '600' : '400' },
+                      ]}
+                    >
+                      {label}
+                    </Text>
+                  </View>
+                </TouchableOpacity>
+              );
+            })}
+          </View>
+        </BlurView>
+      </View>
     </View>
   );
 }
@@ -114,13 +116,18 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     zIndex: 100,
   },
-  blurContainer: {
+  tabBarWrapper: {
     width: '100%',
     borderRadius: 36,
     overflow: 'hidden',
     borderWidth: 1,
     borderColor: 'rgba(255, 255, 255, 0.1)',
     backgroundColor: 'rgba(15, 15, 18, 0.88)',
+  },
+  blurContainer: {
+    width: '100%',
+    borderRadius: 36,
+    overflow: 'hidden',
   },
   tabBarInner: {
     flexDirection: 'row',
@@ -140,13 +147,17 @@ const styles = StyleSheet.create({
     paddingVertical: 6,
     paddingHorizontal: 16,
     borderRadius: 20,
+    overflow: 'hidden',
   },
   activeIconWrapper: {
     backgroundColor: 'rgba(59, 130, 246, 0.15)',
+    borderRadius: 20,
+    overflow: 'hidden',
   },
   tabLabel: {
     fontSize: 11,
     marginTop: 4,
     textAlign: 'center',
+    includeFontPadding: false,
   },
 });

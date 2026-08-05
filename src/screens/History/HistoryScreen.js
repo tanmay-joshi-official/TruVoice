@@ -190,30 +190,33 @@ export default function HistoryScreen({ navigation }) {
         </View>
 
         {/* Filter Pills */}
-        <ScrollView
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          style={styles.filterScroll}
-          contentContainerStyle={styles.filterContainer}
-        >
-          {FILTERS.map((filter) => {
-            const isActive = activeFilter === filter;
-            return (
-              <TouchableOpacity
-                key={filter}
-                activeOpacity={0.7}
-                onPress={() => setActiveFilter(filter)}
-                style={[styles.filterPill, isActive && styles.filterPillActive]}
-              >
-                <Text style={[styles.filterText, isActive && styles.filterTextActive]}>
-                  {filter}
-                </Text>
-              </TouchableOpacity>
-            );
-          })}
-        </ScrollView>
+        <View style={styles.filterWrapper}>
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={styles.filterContainer}
+          >
+            {FILTERS.map((filter) => {
+              const isActive = activeFilter === filter;
+              return (
+                <TouchableOpacity
+                  key={filter}
+                  activeOpacity={0.7}
+                  onPress={() => setActiveFilter(filter)}
+                  style={[styles.filterPill, isActive && styles.filterPillActive]}
+                >
+                  <Text style={[styles.filterText, isActive && styles.filterTextActive]}>
+                    {filter}
+                  </Text>
+                </TouchableOpacity>
+              );
+            })}
+          </ScrollView>
+        </View>
 
+        {/* Main List Scroll */}
         <ScrollView
+          style={styles.mainScroll}
           showsVerticalScrollIndicator={false}
           contentContainerStyle={[
             styles.scrollContent,
@@ -246,7 +249,7 @@ export default function HistoryScreen({ navigation }) {
                           <Text style={styles.avatarText}>{item.initials}</Text>
                         </LinearGradient>
                         <View style={styles.itemMeta}>
-                          <Text style={styles.itemName}>
+                          <Text style={styles.itemName} numberOfLines={1}>
                             {item.name} {item.number ? `· ${item.number}` : ''}
                           </Text>
                           <View style={styles.timeRow}>
@@ -322,12 +325,15 @@ const styles = StyleSheet.create({
     color: '#FFFFFF',
     fontSize: 15,
   },
-  filterScroll: {
-    maxHeight: 44,
+  filterWrapper: {
+    height: 48,
     marginVertical: 6,
+    justifyContent: 'center',
   },
   filterContainer: {
+    alignItems: 'center',
     gap: 8,
+    paddingHorizontal: 2,
   },
   filterPill: {
     paddingHorizontal: 18,
@@ -336,6 +342,8 @@ const styles = StyleSheet.create({
     backgroundColor: '#18181B',
     borderWidth: 1,
     borderColor: 'rgba(255, 255, 255, 0.08)',
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   filterPillActive: {
     backgroundColor: '#3B82F6',
@@ -345,10 +353,15 @@ const styles = StyleSheet.create({
     color: colors.textSecondary,
     fontSize: 13,
     fontWeight: '500',
+    includeFontPadding: false,
   },
   filterTextActive: {
     color: '#FFFFFF',
     fontWeight: '600',
+    includeFontPadding: false,
+  },
+  mainScroll: {
+    flex: 1,
   },
   scrollContent: {
     paddingTop: 4,
@@ -391,6 +404,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
     paddingVertical: 14,
+    minHeight: 68,
   },
   rowBorder: {
     borderBottomWidth: 1,
@@ -400,6 +414,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     flex: 1,
+    marginRight: 12,
   },
   avatar: {
     width: 44,
@@ -416,16 +431,19 @@ const styles = StyleSheet.create({
   },
   itemMeta: {
     flex: 1,
+    justifyContent: 'center',
   },
   itemName: {
     color: '#FFFFFF',
     fontSize: 15,
     fontWeight: '600',
+    lineHeight: 20,
+    includeFontPadding: false,
   },
   timeRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginTop: 3,
+    marginTop: 4,
   },
   icon: {
     marginRight: 4,
@@ -433,14 +451,20 @@ const styles = StyleSheet.create({
   timeText: {
     color: colors.textMuted,
     fontSize: 12,
+    lineHeight: 16,
+    includeFontPadding: false,
   },
   badge: {
     paddingHorizontal: 12,
-    paddingVertical: 5,
+    paddingVertical: 6,
     borderRadius: 14,
+    alignSelf: 'center',
+    justifyContent: 'center',
   },
   badgeText: {
     fontSize: 12,
     fontWeight: '600',
+    lineHeight: 16,
+    includeFontPadding: false,
   },
 });
