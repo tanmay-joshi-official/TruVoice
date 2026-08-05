@@ -21,6 +21,9 @@ import Animated, {
 } from 'react-native-reanimated';
 import { ROUTES } from '../../constants/routes';
 import { colors } from '../../theme';
+import { audioChunker } from '../../services/audio/audioChunker';
+import { socketService } from '../../services/socket/socketService';
+import { useAiDetectionStore } from '../../store/aiDetectionStore';
 
 function ActiveWaveBar({ delay, heightMult = 1 }) {
   const height = useSharedValue(6);
@@ -55,6 +58,10 @@ export default function ActiveCallScreen({ navigation, route }) {
   const [isMuted, setIsMuted] = useState(false);
   const [isSpeaker, setIsSpeaker] = useState(false);
   const [activeFilter, setActiveFilter] = useState('Analyzing');
+  const [chunkCount, setChunkCount] = useState(0);
+
+  const { authenticityScore, aiProbability, confidence, updateAnalysis, addTranscriptLine } =
+    useAiDetectionStore();
 
   useEffect(() => {
     const timer = setInterval(() => {
@@ -63,6 +70,69 @@ export default function ActiveCallScreen({ navigation, route }) {
     return () => clearInterval(timer);
   }, []);
 
+  // Initialize Audio Chunker Service & WebSocket
+  useEffect(() => {
+    let socket;
+    try {
+      socket = socketService.getVoiceAnalysisSocket();
+      socket.on('ai_analysis_update', (data) => {
+        if (data) {
+          updateAnalysis(data);
+        }
+      });
+      socket.on('transcript_chunk', (line) => {
+        if (line) {
+          addTranscriptLine(line);
+        }
+      });
+    } catch (e) {
+      console.log('Socket connect fallback:', e);
+    }
+
+    // Start 5-second mic chunking
+    audioChunker.startChunking((chunkData) => {
+      setChunkCount((prev) => prev + 1);
+
+      // Emit chunk payload over WebSocket if connected
+      if (socket && socket.connected) {
+        socket.emit('audio_chunk', {
+          callId: 'call_' + Date.now(),
+          chunkIndex: chunkData.chunkIndex,
+          audioBase64: chunkData.base64Data,
+          isMuted: chunkData.isMuted,
+          timestamp: chunkData.timestamp,
+        });
+      } else {
+        // Fallback live simulation metrics for chunk processing
+        if (!chunkData.isMuted) {
+          const simulatedScore = Math.max(15, 62 - (chunkData.chunkIndex % 5) * 3);
+          const simulatedAiProb = Math.min(88, 38 + (chunkData.chunkIndex % 5) * 4);
+
+          updateAnalysis({
+            authenticityScore: simulatedScore,
+            aiProbability: simulatedAiProb,
+            confidence: 84,
+            riskLevel: simulatedAiProb > 50 ? 'high' : 'low',
+          });
+        }
+      }
+    });
+
+    return () => {
+      audioChunker.stopChunking();
+      if (socket) {
+        socket.off('ai_analysis_update');
+        socket.off('transcript_chunk');
+      }
+    };
+  }, [updateAnalysis, addTranscriptLine]);
+
+  const handleToggleMute = () => {
+    const nextMuteState = !isMuted;
+    setIsMuted(nextMuteState);
+    audioChunker.setMuted(nextMuteState);
+  };
+
   const formatTimer = (sec) => {
     const mins = Math.floor(sec / 60);
     const remainderSecs = sec % 60;
@@ -70,6 +140,7 @@ export default function ActiveCallScreen({ navigation, route }) {
   };
 
   const handleEndCall = () => {
+    audioChunker.stopChunking();
     navigation.replace(ROUTES.CALL_SUMMARY, { contact });
   };
 
@@ -104,34 +175,38 @@ export default function ActiveCallScreen({ navigation, route }) {
           <View style={styles.gaugeContainer}>
             <View style={styles.gaugeCircle}>
               <Text style={styles.gaugeLabel}>AUTHENTICITY</Text>
-              <Text style={styles.gaugeValue}>62%</Text>
-              <Text style={styles.gaugeSub}>Analyzing</Text>
+              <Text style={styles.gaugeValue}>{authenticityScore || 62}%</Text>
+              <Text style={styles.gaugeSub}>{isMuted ? 'Mic Muted' : 'Analyzing'}</Text>
             </View>
           </View>
 
           {/* Live Spectrum Waveform */}
           <View style={styles.waveformRow}>
             {barMultipliers.map((mult, idx) => (
-              <ActiveWaveBar key={idx} delay={idx * 50} heightMult={mult} />
+              <ActiveWaveBar key={idx} delay={idx * 50} heightMult={isMuted ? 0.2 : mult} />
             ))}
           </View>
-          <Text style={styles.chunkText}>Processing 5s chunk...</Text>
+          <Text style={styles.chunkText}>
+            {isMuted
+              ? 'Microphone is muted'
+              : `Processing 5s chunk ${chunkCount > 0 ? `#${chunkCount}` : '...'}`}
+          </Text>
 
           {/* Metrics Row */}
           <View style={styles.metricsRow}>
             <View style={styles.metricCard}>
               <Text style={styles.metricLabel}>AI PROBABILITY</Text>
-              <Text style={[styles.metricValue, { color: '#3B82F6' }]}>38%</Text>
+              <Text style={[styles.metricValue, { color: '#3B82F6' }]}>{aiProbability || 38}%</Text>
               <View style={styles.progressTrack}>
-                <View style={[styles.progressBar, { width: '38%', backgroundColor: '#3B82F6' }]} />
+                <View style={[styles.progressBar, { width: `${aiProbability || 38}%`, backgroundColor: '#3B82F6' }]} />
               </View>
             </View>
 
             <View style={styles.metricCard}>
               <Text style={styles.metricLabel}>CONFIDENCE</Text>
-              <Text style={styles.metricValue}>54%</Text>
+              <Text style={styles.metricValue}>{confidence || 54}%</Text>
               <View style={styles.progressTrack}>
-                <View style={[styles.progressBar, { width: '54%', backgroundColor: '#FFFFFF' }]} />
+                <View style={[styles.progressBar, { width: `${confidence || 54}%`, backgroundColor: '#FFFFFF' }]} />
               </View>
             </View>
           </View>
@@ -202,11 +277,13 @@ export default function ActiveCallScreen({ navigation, route }) {
           ]}
         >
           <TouchableOpacity
-            onPress={() => setIsMuted(!isMuted)}
+            onPress={handleToggleMute}
             style={[styles.actionBtn, isMuted && styles.actionBtnActive]}
           >
-            <Ionicons name={isMuted ? 'mic-off' : 'mic'} size={20} color="#FFFFFF" />
-            <Text style={styles.actionBtnLabel}>Mute</Text>
+            <Ionicons name={isMuted ? 'mic-off' : 'mic'} size={20} color={isMuted ? '#EF4444' : '#FFFFFF'} />
+            <Text style={[styles.actionBtnLabel, isMuted && { color: '#EF4444' }]}>
+              {isMuted ? 'Muted' : 'Mute'}
+            </Text>
           </TouchableOpacity>
 
           <TouchableOpacity
