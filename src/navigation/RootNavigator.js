@@ -10,6 +10,14 @@ import RegisterScreen from '../screens/Auth/RegisterScreen';
 import OtpScreen from '../screens/Auth/OtpScreen';
 import ForgotPasswordScreen from '../screens/Auth/ForgotPasswordScreen';
 
+import MainTabNavigator from './MainTabNavigator';
+import NotificationsScreen from '../screens/Notifications/NotificationsScreen';
+import OutgoingCallScreen from '../screens/Call/OutgoingCallScreen';
+import IncomingCallScreen from '../screens/Call/IncomingCallScreen';
+import ActiveCallScreen from '../screens/Call/ActiveCallScreen';
+import CallSummaryScreen from '../screens/Call/CallSummaryScreen';
+import CallDetailsScreen from '../screens/Call/CallDetailsScreen';
+
 const Stack = createNativeStackNavigator();
 
 const navTheme = {
@@ -61,9 +69,48 @@ export default function RootNavigator() {
           name={ROUTES.OTP}
           component={OtpScreen}
         />
+
         <Stack.Screen
           name={ROUTES.FORGOT_PASSWORD}
           component={ForgotPasswordScreen}
+        />
+
+        <Stack.Screen
+          name={ROUTES.MAIN_TABS}
+          component={MainTabNavigator}
+        />
+
+        <Stack.Screen
+          name={ROUTES.NOTIFICATIONS}
+          component={NotificationsScreen}
+        />
+
+        <Stack.Screen
+          name={ROUTES.OUTGOING_CALL}
+          component={OutgoingCallScreen}
+          options={{ animation: 'slide_from_bottom' }}
+        />
+
+        <Stack.Screen
+          name={ROUTES.INCOMING_CALL}
+          component={IncomingCallScreen}
+          options={{ animation: 'slide_from_bottom' }}
+        />
+
+        <Stack.Screen
+          name={ROUTES.ACTIVE_CALL}
+          component={ActiveCallScreen}
+          options={{ animation: 'fade' }}
+        />
+
+        <Stack.Screen
+          name={ROUTES.CALL_SUMMARY}
+          component={CallSummaryScreen}
+        />
+
+        <Stack.Screen
+          name={ROUTES.CALL_DETAILS}
+          component={CallDetailsScreen}
         />
       </Stack.Navigator>
     </NavigationContainer>
