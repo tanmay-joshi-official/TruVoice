@@ -8,8 +8,10 @@ import {
   SafeAreaView,
   StatusBar,
   Platform,
+  Alert,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import FloatingCallButton from '../../components/buttons/FloatingCallButton';
 import { ROUTES } from '../../constants/routes';
 import { colors } from '../../theme';
@@ -21,7 +23,35 @@ const RISK_EVENTS = [
   { id: '4', time: '01:18', label: 'OTP request detected', type: 'danger' },
 ];
 
-export default function CallDetailsScreen({ navigation }) {
+const AI_EXPLANATION =
+  "The speaker's fundamental frequency stayed within a 6 Hz band for 87% of the call — natural speech typically varies 3–4× more. Combined with absent breath noise and uniform phoneme timing, the model classified voice as synthetic with 96% confidence.";
+
+export default function CallDetailsScreen({ navigation, route }) {
+  const insets = useSafeAreaInsets();
+  const call = route.params?.call || {};
+
+  const handleReportScam = () => {
+    Alert.alert(
+      'Report Scam',
+      'This call will be reported and added to TruVoice threat intelligence.\n\nOnce the backend is connected, this data will be securely submitted.',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        { text: 'Report', style: 'destructive', onPress: () => Alert.alert('Reported', 'Scam report queued for submission.') },
+      ],
+    );
+  };
+
+  const handleBlockCaller = () => {
+    Alert.alert(
+      'Block Caller',
+      'Are you sure you want to block this caller? Future calls from this number will be automatically declined.',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        { text: 'Block', style: 'destructive', onPress: () => Alert.alert('Blocked', 'Caller has been added to your block list.') },
+      ],
+    );
+  };
+
   return (
     <SafeAreaView style={styles.safeArea}>
       <StatusBar barStyle="light-content" backgroundColor="#09090B" />
@@ -31,6 +61,7 @@ export default function CallDetailsScreen({ navigation }) {
           <TouchableOpacity
             onPress={() => navigation.goBack()}
             style={styles.backBtn}
+            activeOpacity={0.7}
           >
             <Ionicons name="chevron-back" size={24} color="#FFFFFF" />
           </TouchableOpacity>
@@ -40,7 +71,13 @@ export default function CallDetailsScreen({ navigation }) {
           </View>
         </View>
 
-        <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scrollContent}>
+        <ScrollView
+          showsVerticalScrollIndicator={false}
+          contentContainerStyle={[
+            styles.scrollContent,
+            { paddingBottom: Math.max(insets.bottom + 110, 120) },
+          ]}
+        >
           {/* Authenticity Red Radial Ring */}
           <View style={styles.gaugeSection}>
             <View style={styles.gaugeCircle}>
@@ -54,7 +91,14 @@ export default function CallDetailsScreen({ navigation }) {
           <Text style={styles.sectionTitle}>Risk events</Text>
           <View style={styles.card}>
             {RISK_EVENTS.map((event) => (
-              <View key={event.id} style={styles.eventRow}>
+              <TouchableOpacity
+                key={event.id}
+                activeOpacity={0.7}
+                onPress={() =>
+                  Alert.alert(event.label, `Detected at ${event.time}\n\nSeverity: ${event.type === 'danger' ? 'High — confirmed synthetic' : 'Medium — anomalous'}`)
+                }
+                style={styles.eventRow}
+              >
                 <View
                   style={[
                     styles.dot,
@@ -63,20 +107,39 @@ export default function CallDetailsScreen({ navigation }) {
                 />
                 <Text style={styles.eventTime}>{event.time}</Text>
                 <Text style={styles.eventLabel}>{event.label}</Text>
-              </View>
+              </TouchableOpacity>
             ))}
           </View>
 
           {/* AI Explanation Card */}
           <Text style={styles.sectionTitle}>AI explanation</Text>
           <View style={styles.card}>
-            <Text style={styles.explanationText}>
-              The speaker&apos;s fundamental frequency stayed within a 6 Hz band for 87% of the call — natural speech typically varies 3–4× more. Combined with absent breath noise and uniform phoneme timing, the model classified voice as synthetic with 96% confidence.
-            </Text>
+            <Text style={styles.explanationText}>{AI_EXPLANATION}</Text>
+          </View>
+
+          {/* Action Buttons */}
+          <View style={styles.actionsRow}>
+            <TouchableOpacity
+              activeOpacity={0.7}
+              onPress={handleBlockCaller}
+              style={styles.actionBtn}
+            >
+              <Ionicons name="ban-outline" size={18} color="#EF4444" style={{ marginRight: 6 }} />
+              <Text style={styles.actionBtnText}>Block caller</Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              activeOpacity={0.7}
+              onPress={handleReportScam}
+              style={styles.actionBtn}
+            >
+              <Ionicons name="flag-outline" size={18} color="#F59E0B" style={{ marginRight: 6 }} />
+              <Text style={[styles.actionBtnText, { color: '#F59E0B' }]}>Report scam</Text>
+            </TouchableOpacity>
           </View>
         </ScrollView>
 
-        <FloatingCallButton onPress={() => navigation.navigate(ROUTES.OUTGOING_CALL, { contact: { name: 'Priya Nair' } })} />
+        <FloatingCallButton onPress={() => navigation.navigate(ROUTES.OUTGOING_CALL, { contact: { name: 'Priya Nair', initials: 'PN', number: '+1 415 890' } })} />
       </View>
     </SafeAreaView>
   );
@@ -117,9 +180,7 @@ const styles = StyleSheet.create({
     fontSize: 12,
     marginTop: 1,
   },
-  scrollContent: {
-    paddingBottom: 110,
-  },
+  scrollContent: {},
   gaugeSection: {
     alignItems: 'center',
     marginVertical: 16,
@@ -191,5 +252,26 @@ const styles = StyleSheet.create({
     color: colors.textSecondary,
     fontSize: 14,
     lineHeight: 22,
+  },
+  actionsRow: {
+    flexDirection: 'row',
+    gap: 12,
+    marginTop: 20,
+  },
+  actionBtn: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#131316',
+    borderRadius: 18,
+    paddingVertical: 14,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.08)',
+  },
+  actionBtnText: {
+    color: '#EF4444',
+    fontSize: 14,
+    fontWeight: '600',
   },
 });

@@ -1,18 +1,29 @@
 import React from 'react';
 import { View, Text, ScrollView, TouchableOpacity, StyleSheet } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
+import { useContactsStore } from '../../store/contactsStore';
 import { colors } from '../../theme';
 
-const MOCK_RECENT_CONTACTS = [
-  { id: '1', initials: 'RK', name: 'Riya', colors: ['#F97316', '#EC4899'], isOnline: true },
-  { id: '2', initials: 'PN', name: 'Priya', colors: ['#3B82F6', '#6366F1'], isOnline: true },
-  { id: '3', initials: 'DO', name: 'Daniel', colors: ['#8B5CF6', '#3B82F6'], isOnline: false },
-  { id: '4', initials: 'EV', name: 'Elena', colors: ['#EC4899', '#F97316'], isOnline: true },
-  { id: '5', initials: 'FI', name: 'Farah', colors: ['#3B82F6', '#22C55E'], isOnline: false },
-  { id: '6', initials: 'KS', name: 'Kenji', colors: ['#6366F1', '#A855F7'], isOnline: false },
+const FALLBACK_CONTACTS = [
+  { id: 'fb1', initials: 'RK', name: 'Riya', colors: ['#F97316', '#EC4899'], isOnline: true },
+  { id: 'fb2', initials: 'PN', name: 'Priya', colors: ['#3B82F6', '#6366F1'], isOnline: true },
+  { id: 'fb3', initials: 'DO', name: 'Daniel', colors: ['#8B5CF6', '#3B82F6'], isOnline: false },
+  { id: 'fb4', initials: 'EV', name: 'Elena', colors: ['#EC4899', '#F97316'], isOnline: true },
+  { id: 'fb5', initials: 'FI', name: 'Farah', colors: ['#3B82F6', '#22C55E'], isOnline: false },
+  { id: 'fb6', initials: 'KS', name: 'Kenji', colors: ['#6366F1', '#A855F7'], isOnline: false },
 ];
 
 export default function RecentContactsScroll({ onSelectContact, onSeeAll }) {
+  const storeContacts = useContactsStore((state) => state.contacts);
+
+  // Use real device contacts if available, otherwise fallback
+  const displayContacts = storeContacts && storeContacts.length > 0
+    ? storeContacts.slice(0, 8).map((c) => ({
+        ...c,
+        name: c.name.split(' ')[0], // Show first name only in the scroll
+      }))
+    : FALLBACK_CONTACTS;
+
   return (
     <View style={styles.container}>
       <View style={styles.header}>
@@ -27,7 +38,7 @@ export default function RecentContactsScroll({ onSelectContact, onSeeAll }) {
         showsHorizontalScrollIndicator={false}
         contentContainerStyle={styles.scrollContent}
       >
-        {MOCK_RECENT_CONTACTS.map((contact) => (
+        {displayContacts.map((contact) => (
           <TouchableOpacity
             key={contact.id}
             activeOpacity={0.75}

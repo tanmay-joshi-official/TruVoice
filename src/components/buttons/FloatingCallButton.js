@@ -1,13 +1,17 @@
 import React from 'react';
 import { TouchableOpacity, StyleSheet } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 export default function FloatingCallButton({ onPress }) {
+  const insets = useSafeAreaInsets();
+  const bottomPosition = Math.max(insets.bottom + 84, 94);
+
   return (
     <TouchableOpacity
       activeOpacity={0.85}
       onPress={onPress}
-      style={styles.fab}
+      style={[styles.fab, { bottom: bottomPosition }]}
     >
       <Ionicons name="call" size={26} color="#FFFFFF" />
     </TouchableOpacity>
@@ -17,7 +21,6 @@ export default function FloatingCallButton({ onPress }) {
 const styles = StyleSheet.create({
   fab: {
     position: 'absolute',
-    bottom: 96,
     right: 20,
     width: 60,
     height: 60,

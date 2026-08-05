@@ -2,9 +2,13 @@ import React from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, Platform } from 'react-native';
 import { BlurView } from 'expo-blur';
 import { Ionicons } from '@expo/vector-icons';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { colors } from '../../theme';
 
 export default function GlassTabBar({ state, descriptors, navigation }) {
+  const insets = useSafeAreaInsets();
+  const bottomPosition = Math.max(insets.bottom + 8, 16);
+
   const getIconName = (routeName, isFocused) => {
     switch (routeName) {
       case 'Home':
@@ -36,7 +40,7 @@ export default function GlassTabBar({ state, descriptors, navigation }) {
   };
 
   return (
-    <View style={styles.container} pointerEvents="box-none">
+    <View style={[styles.container, { bottom: bottomPosition }]} pointerEvents="box-none">
       <BlurView intensity={Platform.OS === 'ios' ? 40 : 80} tint="dark" style={styles.blurContainer}>
         <View style={styles.tabBarInner}>
           {state.routes.map((route, index) => {
@@ -104,7 +108,6 @@ export default function GlassTabBar({ state, descriptors, navigation }) {
 const styles = StyleSheet.create({
   container: {
     position: 'absolute',
-    bottom: 24,
     left: 20,
     right: 20,
     alignItems: 'center',
@@ -117,7 +120,7 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
     borderWidth: 1,
     borderColor: 'rgba(255, 255, 255, 0.1)',
-    backgroundColor: 'rgba(15, 15, 18, 0.85)',
+    backgroundColor: 'rgba(15, 15, 18, 0.88)',
   },
   tabBarInner: {
     flexDirection: 'row',

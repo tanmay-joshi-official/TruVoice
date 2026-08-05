@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
   View,
   Text,
@@ -9,51 +9,62 @@ import {
   SafeAreaView,
   StatusBar,
   Platform,
+  ActivityIndicator,
+  Alert,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import FloatingCallButton from '../../components/buttons/FloatingCallButton';
 import { ROUTES } from '../../constants/routes';
+import { useContactsStore } from '../../store/contactsStore';
 import { colors } from '../../theme';
 
-const FAVORITES = [
-  { id: 'f1', name: 'Riya', initials: 'RK', colors: ['#F97316', '#EC4899'], isOnline: true },
-  { id: 'f2', name: 'Priya', initials: 'PN', colors: ['#3B82F6', '#6366F1'], isOnline: true },
-  { id: 'f3', name: 'Elena', initials: 'EV', colors: ['#EC4899', '#F97316'], isOnline: true },
-];
-
-const CONTACT_GROUPS = [
-  {
-    letter: 'D',
-    contacts: [
-      { id: 'd1', name: 'Daniel Okafor', handle: '@dokafor', status: 'Last seen 2h ago', initials: 'DO', colors: ['#8B5CF6', '#3B82F6'] },
-    ],
-  },
-  {
-    letter: 'E',
-    contacts: [
-      { id: 'e1', name: 'Elena Voss', handle: '@evoss', status: 'Online', initials: 'EV', colors: ['#EC4899', '#F97316'], isOnline: true },
-    ],
-  },
-  {
-    letter: 'F',
-    contacts: [
-      { id: 'f1', name: 'Farah Idris', handle: '@farah', status: 'Last seen 2h ago', initials: 'FI', colors: ['#3B82F6', '#22C55E'] },
-    ],
-  },
-  {
-    letter: 'K',
-    contacts: [
-      { id: 'k1', name: 'Kenji Sato', handle: '@kenji', status: 'Last seen 2h ago', initials: 'KS', colors: ['#6366F1', '#A855F7'] },
-    ],
-  },
+// Fallback contact list when device contacts are empty or permission pending
+const FALLBACK_CONTACTS = [
+  { id: 'fb1', name: 'Riya Kapoor', number: '+1 415 901', handle: '@riya', initials: 'RK', colors: ['#F97316', '#EC4899'], isOnline: true, status: 'Online' },
+  { id: 'fb2', name: 'Priya Nair', number: '+1 415 890', handle: '@priya', initials: 'PN', colors: ['#3B82F6', '#6366F1'], isOnline: true, status: 'Online' },
+  { id: 'fb3', name: 'Daniel Okafor', number: '+1 415 772', handle: '@dokafor', initials: 'DO', colors: ['#8B5CF6', '#3B82F6'], isOnline: false, status: 'Last seen 2h ago' },
+  { id: 'fb4', name: 'Elena Voss', number: '+1 415 654', handle: '@evoss', initials: 'EV', colors: ['#EC4899', '#F97316'], isOnline: true, status: 'Online' },
+  { id: 'fb5', name: 'Farah Idris', number: '+1 415 331', handle: '@farah', initials: 'FI', colors: ['#3B82F6', '#22C55E'], isOnline: false, status: 'Last seen 2h ago' },
+  { id: 'fb6', name: 'Kenji Sato', number: '+1 415 119', handle: '@kenji', initials: 'KS', colors: ['#6366F1', '#A855F7'], isOnline: false, status: 'Last seen 2h ago' },
 ];
 
 export default function ContactsScreen({ navigation }) {
+  const insets = useSafeAreaInsets();
   const [search, setSearch] = useState('');
+  const { contacts, permissionGranted, isLoading, loadContacts, requestPermissionAndLoad } = useContactsStore();
+
+  useEffect(() => {
+    loadContacts();
+  }, []);
+
+  const displayList = (contacts && contacts.length > 0 ? contacts : FALLBACK_CONTACTS).filter(
+    (c) =>
+      c.name.toLowerCase().includes(search.toLowerCase()) ||
+      c.number.toLowerCase().includes(search.toLowerCase())
+  );
+
+  const favorites = displayList.slice(0, 3);
+
+  // Group remaining contacts by first letter
+  const groupedContacts = displayList.reduce((acc, contact) => {
+    const letter = (contact.name[0] || 'A').toUpperCase();
+    if (!acc[letter]) {
+      acc[letter] = [];
+    }
+    acc[letter].push(contact);
+    return acc;
+  }, {});
+
+  const sortedLetters = Object.keys(groupedContacts).sort();
 
   const startCall = (contact) => {
     navigation.navigate(ROUTES.OUTGOING_CALL, { contact });
+  };
+
+  const handleRequestPermission = async () => {
+    await requestPermissionAndLoad();
   };
 
   return (
@@ -63,82 +74,129 @@ export default function ContactsScreen({ navigation }) {
         {/* Header */}
         <View style={styles.header}>
           <Text style={styles.title}>Contacts</Text>
-          <Text style={styles.subtitle}>8 people · 4 online</Text>
+          <Text style={styles.subtitle}>
+            {displayList.length} people · {displayList.filter((c) => c.isOnline).length} online
+          </Text>
         </View>
 
-        {/* Search */}
+        {/* Permission Request Banner if permission not granted */}
+        {!permissionGranted && (
+          <TouchableOpacity
+            activeOpacity={0.8}
+            onPress={handleRequestPermission}
+            style={styles.permissionBanner}
+          >
+            <Ionicons name="people-circle-outline" size={24} color="#3B82F6" style={{ marginRight: 10 }} />
+            <View style={{ flex: 1 }}>
+              <Text style={styles.permTitle}>Allow TruVoice to sync contacts</Text>
+              <Text style={styles.permSub}>Tap to request phone contacts permission for AI call protection.</Text>
+            </View>
+            <Ionicons name="chevron-forward" size={18} color="#3B82F6" />
+          </TouchableOpacity>
+        )}
+
+        {/* Search Input */}
         <View style={styles.searchContainer}>
           <Ionicons name="search-outline" size={20} color={colors.textMuted} style={styles.searchIcon} />
           <TextInput
             style={styles.searchInput}
-            placeholder="Search contacts"
+            placeholder="Search contacts by name or number"
             placeholderTextColor={colors.textMuted}
             value={search}
             onChangeText={setSearch}
           />
+          {search ? (
+            <TouchableOpacity onPress={() => setSearch('')}>
+              <Ionicons name="close-circle" size={18} color={colors.textMuted} />
+            </TouchableOpacity>
+          ) : null}
         </View>
 
-        <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scrollContent}>
-          {/* Favorites */}
-          <Text style={styles.sectionHeading}>Favorites</Text>
-          <View style={styles.favoritesRow}>
-            {FAVORITES.map((fav) => (
-              <View key={fav.id} style={styles.favoriteCard}>
-                <View style={styles.favAvatarContainer}>
-                  <LinearGradient colors={fav.colors} style={styles.favAvatar}>
-                    <Text style={styles.favAvatarText}>{fav.initials}</Text>
-                  </LinearGradient>
-                  {fav.isOnline && <View style={styles.favOnlineBadge} />}
+        {isLoading ? (
+          <View style={styles.loadingContainer}>
+            <ActivityIndicator size="large" color="#3B82F6" />
+            <Text style={styles.loadingText}>Fetching device contacts...</Text>
+          </View>
+        ) : (
+          <ScrollView
+            showsVerticalScrollIndicator={false}
+            contentContainerStyle={[
+              styles.scrollContent,
+              { paddingBottom: Math.max(insets.bottom + 110, 120) },
+            ]}
+          >
+            {/* Favorites */}
+            {favorites.length > 0 && (
+              <>
+                <Text style={styles.sectionHeading}>Favorites</Text>
+                <View style={styles.favoritesRow}>
+                  {favorites.map((fav) => (
+                    <TouchableOpacity
+                      key={fav.id}
+                      activeOpacity={0.8}
+                      onPress={() => startCall(fav)}
+                      style={styles.favoriteCard}
+                    >
+                      <View style={styles.favAvatarContainer}>
+                        <LinearGradient colors={fav.colors} style={styles.favAvatar}>
+                          <Text style={styles.favAvatarText}>{fav.initials}</Text>
+                        </LinearGradient>
+                        {fav.isOnline && <View style={styles.favOnlineBadge} />}
+                      </View>
+                      <Text style={styles.favName} numberOfLines={1}>
+                        {fav.name.split(' ')[0]}
+                      </Text>
+                      <View style={styles.favCallBtn}>
+                        <Ionicons name="call" size={16} color="#3B82F6" />
+                      </View>
+                    </TouchableOpacity>
+                  ))}
                 </View>
-                <Text style={styles.favName}>{fav.name}</Text>
-                <TouchableOpacity
-                  activeOpacity={0.8}
-                  onPress={() => startCall(fav)}
-                  style={styles.favCallBtn}
-                >
-                  <Ionicons name="call" size={16} color="#3B82F6" />
-                </TouchableOpacity>
+              </>
+            )}
+
+            {/* Grouped Alphabetical List */}
+            {sortedLetters.map((letter) => (
+              <View key={letter} style={styles.groupContainer}>
+                <Text style={styles.letterHeader}>{letter}</Text>
+                {groupedContacts[letter].map((contact) => (
+                  <TouchableOpacity
+                    key={contact.id}
+                    activeOpacity={0.7}
+                    onPress={() => startCall(contact)}
+                    style={styles.contactRow}
+                  >
+                    <View style={styles.contactLeft}>
+                      <View style={styles.contactAvatarWrapper}>
+                        <LinearGradient colors={contact.colors} style={styles.contactAvatar}>
+                          <Text style={styles.contactAvatarText}>{contact.initials}</Text>
+                        </LinearGradient>
+                        {contact.isOnline && <View style={styles.contactOnlineBadge} />}
+                      </View>
+
+                      <View style={styles.contactMeta}>
+                        <Text style={styles.contactName}>{contact.name}</Text>
+                        <Text style={styles.contactSubtext}>
+                          {contact.number || contact.handle}
+                        </Text>
+                      </View>
+                    </View>
+
+                    <TouchableOpacity
+                      activeOpacity={0.7}
+                      onPress={() => startCall(contact)}
+                      style={styles.shieldBtn}
+                    >
+                      <Ionicons name="shield-checkmark-outline" size={18} color="#3B82F6" />
+                    </TouchableOpacity>
+                  </TouchableOpacity>
+                ))}
               </View>
             ))}
-          </View>
+          </ScrollView>
+        )}
 
-          {/* Grouped Alphabetical List */}
-          {CONTACT_GROUPS.map((group) => (
-            <View key={group.letter} style={styles.groupContainer}>
-              <Text style={styles.letterHeader}>{group.letter}</Text>
-              {group.contacts.map((contact) => (
-                <TouchableOpacity
-                  key={contact.id}
-                  activeOpacity={0.7}
-                  onPress={() => startCall(contact)}
-                  style={styles.contactRow}
-                >
-                  <View style={styles.contactLeft}>
-                    <View style={styles.contactAvatarWrapper}>
-                      <LinearGradient colors={contact.colors} style={styles.contactAvatar}>
-                        <Text style={styles.contactAvatarText}>{contact.initials}</Text>
-                      </LinearGradient>
-                      {contact.isOnline && <View style={styles.contactOnlineBadge} />}
-                    </View>
-
-                    <View style={styles.contactMeta}>
-                      <Text style={styles.contactName}>{contact.name}</Text>
-                      <Text style={styles.contactSubtext}>
-                        {contact.status} · {contact.handle}
-                      </Text>
-                    </View>
-                  </View>
-
-                  <View style={styles.shieldBtn}>
-                    <Ionicons name="shield-checkmark-outline" size={18} color="#3B82F6" />
-                  </View>
-                </TouchableOpacity>
-              ))}
-            </View>
-          ))}
-        </ScrollView>
-
-        <FloatingCallButton onPress={() => startCall(FAVORITES[0])} />
+        <FloatingCallButton onPress={() => startCall(displayList[0] || FALLBACK_CONTACTS[0])} />
       </View>
     </SafeAreaView>
   );
@@ -156,7 +214,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
   },
   header: {
-    paddingVertical: 14,
+    paddingVertical: 12,
   },
   title: {
     color: '#FFFFFF',
@@ -169,6 +227,26 @@ const styles = StyleSheet.create({
     fontSize: 13,
     marginTop: 2,
   },
+  permissionBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'rgba(59, 130, 246, 0.12)',
+    borderRadius: 18,
+    padding: 14,
+    marginBottom: 8,
+    borderWidth: 1,
+    borderColor: 'rgba(59, 130, 246, 0.25)',
+  },
+  permTitle: {
+    color: '#FFFFFF',
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  permSub: {
+    color: colors.textSecondary,
+    fontSize: 12,
+    marginTop: 2,
+  },
   searchContainer: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -176,7 +254,7 @@ const styles = StyleSheet.create({
     borderRadius: 20,
     paddingHorizontal: 16,
     height: 50,
-    marginVertical: 10,
+    marginVertical: 8,
     borderWidth: 1,
     borderColor: 'rgba(255, 255, 255, 0.08)',
   },
@@ -188,38 +266,48 @@ const styles = StyleSheet.create({
     color: '#FFFFFF',
     fontSize: 15,
   },
+  loadingContainer: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  loadingText: {
+    color: colors.textSecondary,
+    fontSize: 14,
+    marginTop: 12,
+  },
   scrollContent: {
-    paddingBottom: 110,
+    paddingTop: 8,
   },
   sectionHeading: {
     color: '#FFFFFF',
     fontSize: 16,
     fontWeight: '700',
-    marginVertical: 12,
+    marginVertical: 10,
   },
   favoritesRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     gap: 12,
-    marginBottom: 20,
+    marginBottom: 16,
   },
   favoriteCard: {
     flex: 1,
     backgroundColor: '#131316',
     borderRadius: 24,
-    padding: 16,
+    padding: 14,
     alignItems: 'center',
     borderWidth: 1,
     borderColor: 'rgba(255, 255, 255, 0.08)',
   },
   favAvatarContainer: {
     position: 'relative',
-    marginBottom: 8,
+    marginBottom: 6,
   },
   favAvatar: {
-    width: 56,
-    height: 56,
-    borderRadius: 28,
+    width: 52,
+    height: 52,
+    borderRadius: 26,
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -241,20 +329,20 @@ const styles = StyleSheet.create({
   },
   favName: {
     color: '#FFFFFF',
-    fontSize: 14,
+    fontSize: 13,
     fontWeight: '600',
-    marginBottom: 10,
+    marginBottom: 8,
   },
   favCallBtn: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
+    width: 36,
+    height: 36,
+    borderRadius: 18,
     backgroundColor: 'rgba(59, 130, 246, 0.15)',
     alignItems: 'center',
     justifyContent: 'center',
   },
   groupContainer: {
-    marginBottom: 16,
+    marginBottom: 14,
   },
   letterHeader: {
     color: colors.textMuted,
@@ -283,9 +371,9 @@ const styles = StyleSheet.create({
     marginRight: 12,
   },
   contactAvatar: {
-    width: 46,
-    height: 46,
-    borderRadius: 23,
+    width: 44,
+    height: 44,
+    borderRadius: 22,
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -310,7 +398,7 @@ const styles = StyleSheet.create({
   },
   contactName: {
     color: '#FFFFFF',
-    fontSize: 16,
+    fontSize: 15,
     fontWeight: '600',
   },
   contactSubtext: {

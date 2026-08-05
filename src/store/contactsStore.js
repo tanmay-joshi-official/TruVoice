@@ -1,15 +1,42 @@
 import { create } from 'zustand';
+import { fetchDeviceContacts, requestContactsPermission } from '../services/contacts/contactsService';
 
-export const useContactsStore = create((set) => ({
+export const useContactsStore = create((set, get) => ({
   contacts: [],
-  recentContacts: [],
+  permissionGranted: false,
   isLoading: false,
   searchQuery: '',
 
   setContacts: (contacts) => set({ contacts }),
-  setRecentContacts: (recentContacts) => set({ recentContacts }),
-  setLoading: (isLoading) => set({ isLoading }),
   setSearchQuery: (searchQuery) => set({ searchQuery }),
+
+  loadContacts: async () => {
+    set({ isLoading: true });
+    const { granted, contacts } = await fetchDeviceContacts();
+    set({
+      permissionGranted: granted,
+      contacts: contacts,
+      isLoading: false,
+    });
+  },
+
+  requestPermissionAndLoad: async () => {
+    set({ isLoading: true });
+    const granted = await requestContactsPermission();
+    if (granted) {
+      const result = await fetchDeviceContacts();
+      set({
+        permissionGranted: true,
+        contacts: result.contacts,
+        isLoading: false,
+      });
+    } else {
+      set({
+        permissionGranted: false,
+        isLoading: false,
+      });
+    }
+  },
 }));
 
 export default useContactsStore;

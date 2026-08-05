@@ -10,10 +10,12 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { ROUTES } from '../../constants/routes';
 import { colors } from '../../theme';
 
 export default function OutgoingCallScreen({ navigation, route }) {
+  const insets = useSafeAreaInsets();
   const contact = route.params?.contact || {
     name: 'Priya Nair',
     number: '+1 415 890',
@@ -40,7 +42,12 @@ export default function OutgoingCallScreen({ navigation, route }) {
   return (
     <SafeAreaView style={styles.safeArea}>
       <StatusBar barStyle="light-content" backgroundColor="#09090B" />
-      <View style={styles.container}>
+      <View
+        style={[
+          styles.container,
+          { paddingBottom: Math.max(insets.bottom + 20, 40) },
+        ]}
+      >
         {/* Back Button */}
         <TouchableOpacity
           onPress={handleEnd}
@@ -137,7 +144,6 @@ const styles = StyleSheet.create({
     backgroundColor: '#09090B',
     paddingHorizontal: 24,
     justifyContent: 'space-between',
-    paddingBottom: 40,
   },
   backButton: {
     width: 40,

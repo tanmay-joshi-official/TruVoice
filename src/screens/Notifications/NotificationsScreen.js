@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import {
   View,
   Text,
@@ -8,13 +8,15 @@ import {
   SafeAreaView,
   StatusBar,
   Platform,
+  Alert,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import FloatingCallButton from '../../components/buttons/FloatingCallButton';
 import { ROUTES } from '../../constants/routes';
 import { colors } from '../../theme';
 
-const NOTIFICATIONS = [
+const INITIAL_NOTIFICATIONS = [
   {
     id: 'n1',
     title: 'Synthetic voice detected',
@@ -23,6 +25,8 @@ const NOTIFICATIONS = [
     icon: 'warning-outline',
     iconColor: '#EF4444',
     iconBg: 'rgba(239, 68, 68, 0.15)',
+    read: false,
+    targetRoute: ROUTES.CALL_DETAILS,
   },
   {
     id: 'n2',
@@ -32,6 +36,8 @@ const NOTIFICATIONS = [
     icon: 'shield-checkmark-outline',
     iconColor: '#22C55E',
     iconBg: 'rgba(34, 197, 94, 0.15)',
+    read: false,
+    targetRoute: ROUTES.CALL_SUMMARY,
   },
   {
     id: 'n3',
@@ -41,6 +47,8 @@ const NOTIFICATIONS = [
     icon: 'call-outline',
     iconColor: '#F59E0B',
     iconBg: 'rgba(245, 158, 11, 0.15)',
+    read: false,
+    targetRoute: ROUTES.OUTGOING_CALL,
   },
   {
     id: 'n4',
@@ -50,10 +58,38 @@ const NOTIFICATIONS = [
     icon: 'download-outline',
     iconColor: '#3B82F6',
     iconBg: 'rgba(59, 130, 246, 0.15)',
+    read: false,
+    targetRoute: null,
   },
 ];
 
 export default function NotificationsScreen({ navigation }) {
+  const insets = useSafeAreaInsets();
+  const [notifications, setNotifications] = useState(INITIAL_NOTIFICATIONS);
+
+  const unreadCount = notifications.filter((n) => !n.read).length;
+
+  const handleNotificationPress = (item) => {
+    setNotifications((prev) =>
+      prev.map((n) => (n.id === item.id ? { ...n, read: true } : n))
+    );
+
+    if (item.targetRoute) {
+      navigation.navigate(item.targetRoute, {
+        contact: { name: 'Unknown Caller', number: '+1 415 220', initials: 'UC' },
+      });
+    } else {
+      Alert.alert(
+        item.title,
+        `${item.description}\n\nDetection model v2.4 active with 98.4% accuracy.`
+      );
+    }
+  };
+
+  const handleMarkAllRead = () => {
+    setNotifications((prev) => prev.map((n) => ({ ...n, read: true })));
+  };
+
   return (
     <SafeAreaView style={styles.safeArea}>
       <StatusBar barStyle="light-content" backgroundColor="#09090B" />
@@ -67,19 +103,40 @@ export default function NotificationsScreen({ navigation }) {
             >
               <Ionicons name="chevron-back" size={24} color="#FFFFFF" />
             </TouchableOpacity>
-            <View style={styles.newBadge}>
-              <Text style={styles.newBadgeText}>4 new</Text>
-            </View>
+
+            {unreadCount > 0 ? (
+              <TouchableOpacity onPress={handleMarkAllRead} style={styles.newBadge}>
+                <Text style={styles.newBadgeText}>{unreadCount} new</Text>
+              </TouchableOpacity>
+            ) : (
+              <View style={styles.readBadge}>
+                <Text style={styles.readBadgeText}>All read</Text>
+              </View>
+            )}
           </View>
 
           <Text style={styles.title}>Notifications</Text>
           <Text style={styles.subtitle}>Security alerts and activity</Text>
         </View>
 
-        <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scrollContent}>
+        <ScrollView
+          showsVerticalScrollIndicator={false}
+          contentContainerStyle={[
+            styles.scrollContent,
+            { paddingBottom: Math.max(insets.bottom + 110, 120) },
+          ]}
+        >
           {/* Alert Cards */}
-          {NOTIFICATIONS.map((item) => (
-            <TouchableOpacity key={item.id} activeOpacity={0.7} style={styles.alertCard}>
+          {notifications.map((item) => (
+            <TouchableOpacity
+              key={item.id}
+              activeOpacity={0.7}
+              onPress={() => handleNotificationPress(item)}
+              style={[
+                styles.alertCard,
+                !item.read && styles.alertCardUnread,
+              ]}
+            >
               <View style={[styles.iconBox, { backgroundColor: item.iconBg }]}>
                 <Ionicons name={item.icon} size={22} color={item.iconColor} />
               </View>
@@ -151,6 +208,17 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: '700',
   },
+  readBadge: {
+    backgroundColor: 'rgba(34, 197, 94, 0.15)',
+    paddingHorizontal: 12,
+    paddingVertical: 4,
+    borderRadius: 12,
+  },
+  readBadgeText: {
+    color: '#22C55E',
+    fontSize: 12,
+    fontWeight: '600',
+  },
   title: {
     color: '#FFFFFF',
     fontSize: 28,
@@ -163,7 +231,6 @@ const styles = StyleSheet.create({
     marginTop: 2,
   },
   scrollContent: {
-    paddingBottom: 110,
     paddingTop: 8,
   },
   alertCard: {
@@ -175,6 +242,10 @@ const styles = StyleSheet.create({
     marginBottom: 12,
     borderWidth: 1,
     borderColor: 'rgba(255, 255, 255, 0.08)',
+  },
+  alertCardUnread: {
+    borderColor: 'rgba(59, 130, 246, 0.3)',
+    backgroundColor: '#16161B',
   },
   iconBox: {
     width: 44,

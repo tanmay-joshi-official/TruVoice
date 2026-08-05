@@ -11,6 +11,7 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Animated, {
   useSharedValue,
   useAnimatedStyle,
@@ -43,6 +44,7 @@ function ActiveWaveBar({ delay, heightMult = 1 }) {
 }
 
 export default function ActiveCallScreen({ navigation, route }) {
+  const insets = useSafeAreaInsets();
   const contact = route.params?.contact || {
     name: 'Unknown Caller',
     number: '+1 415 220',
@@ -91,7 +93,13 @@ export default function ActiveCallScreen({ navigation, route }) {
           <Text style={styles.timerText}>{formatTimer(seconds)}</Text>
         </View>
 
-        <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scrollContent}>
+        <ScrollView
+          showsVerticalScrollIndicator={false}
+          contentContainerStyle={[
+            styles.scrollContent,
+            { paddingBottom: Math.max(insets.bottom + 110, 120) },
+          ]}
+        >
           {/* Radial Authenticity Gauge */}
           <View style={styles.gaugeContainer}>
             <View style={styles.gaugeCircle}>
@@ -187,7 +195,12 @@ export default function ActiveCallScreen({ navigation, route }) {
         </ScrollView>
 
         {/* Bottom Call Action Bar */}
-        <View style={styles.actionBar}>
+        <View
+          style={[
+            styles.actionBar,
+            { bottom: Math.max(insets.bottom + 10, 20) },
+          ]}
+        >
           <TouchableOpacity
             onPress={() => setIsMuted(!isMuted)}
             style={[styles.actionBtn, isMuted && styles.actionBtnActive]}
@@ -269,7 +282,6 @@ const styles = StyleSheet.create({
     fontWeight: '700',
   },
   scrollContent: {
-    paddingBottom: 110,
     paddingTop: 10,
   },
   gaugeContainer: {
@@ -434,7 +446,6 @@ const styles = StyleSheet.create({
   },
   actionBar: {
     position: 'absolute',
-    bottom: 20,
     left: 20,
     right: 20,
     flexDirection: 'row',

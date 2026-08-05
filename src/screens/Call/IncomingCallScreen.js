@@ -10,6 +10,7 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Animated, {
   useSharedValue,
   useAnimatedStyle,
@@ -42,6 +43,7 @@ function IncomingWaveBar({ delay, heightMult = 1 }) {
 }
 
 export default function IncomingCallScreen({ navigation, route }) {
+  const insets = useSafeAreaInsets();
   const contact = route.params?.contact || {
     name: 'Elena Voss',
     number: '+1 415 890',
@@ -62,7 +64,12 @@ export default function IncomingCallScreen({ navigation, route }) {
   return (
     <SafeAreaView style={styles.safeArea}>
       <StatusBar barStyle="light-content" backgroundColor="#09090B" />
-      <View style={styles.container}>
+      <View
+        style={[
+          styles.container,
+          { paddingBottom: Math.max(insets.bottom + 20, 30) },
+        ]}
+      >
         {/* Top AI Protection Status Pill */}
         <View style={styles.protectionPill}>
           <Ionicons name="shield-checkmark-outline" size={16} color="#22C55E" style={{ marginRight: 6 }} />
@@ -137,7 +144,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 24,
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingVertical: 30,
+    paddingTop: 30,
   },
   protectionPill: {
     flexDirection: 'row',

@@ -8,18 +8,41 @@ import {
   SafeAreaView,
   StatusBar,
   Platform,
+  Alert,
 } from 'react-native';
+import { Clipboard } from 'expo-clipboard';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Svg, { Path, Defs, LinearGradient as SvgGradient, Stop } from 'react-native-svg';
 import { ROUTES } from '../../constants/routes';
 import { colors } from '../../theme';
 
+const TRANSCRIPT_LINES = [
+  { time: '00:04', text: "Good morning, I'm calling from the fraud department." },
+  { time: '00:11', text: 'Which bank is this exactly?' },
+  { time: '00:16', text: 'Your account has been flagged. I need to verify a code sent to you.' },
+  { time: '00:24', text: "I'm not sharing any code." },
+];
+
 export default function CallSummaryScreen({ navigation, route }) {
+  const insets = useSafeAreaInsets();
   const contact = route.params?.contact || {
     name: 'Unknown Caller',
     number: '+1 415 220',
     initials: 'UC',
+  };
+
+  const handleCopyTranscript = async () => {
+    const transcriptText = TRANSCRIPT_LINES
+      .map((line) => `[${line.time}] ${line.text}`)
+      .join('\n');
+    try {
+      await Clipboard.setStringAsync(transcriptText);
+      Alert.alert('Copied', 'Full transcript copied to clipboard.');
+    } catch {
+      Alert.alert('Copy', 'Transcript:\n\n' + transcriptText);
+    }
   };
 
   return (
@@ -31,16 +54,26 @@ export default function CallSummaryScreen({ navigation, route }) {
           <TouchableOpacity
             onPress={() => navigation.navigate(ROUTES.MAIN_TABS)}
             style={styles.backBtn}
+            activeOpacity={0.7}
           >
             <Ionicons name="chevron-back" size={24} color="#FFFFFF" />
           </TouchableOpacity>
           <Text style={styles.headerTitle}>Call summary</Text>
         </View>
 
-        <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scrollContent}>
+        <ScrollView
+          showsVerticalScrollIndicator={false}
+          contentContainerStyle={[
+            styles.scrollContent,
+            { paddingBottom: Math.max(insets.bottom + 40, 50) },
+          ]}
+        >
           {/* Main Summary Header Card */}
           <View style={styles.summaryCard}>
-            <LinearGradient colors={['#EF4444', '#3B82F6']} style={styles.avatar}>
+            <LinearGradient
+              colors={contact.colors || ['#EF4444', '#3B82F6']}
+              style={styles.avatar}
+            >
               <Text style={styles.avatarText}>{contact.initials || 'UC'}</Text>
             </LinearGradient>
 
@@ -91,35 +124,18 @@ export default function CallSummaryScreen({ navigation, route }) {
           {/* Transcript Section */}
           <View style={styles.transcriptHeader}>
             <Text style={styles.sectionTitle}>Transcript</Text>
-            <TouchableOpacity activeOpacity={0.7}>
+            <TouchableOpacity activeOpacity={0.7} onPress={handleCopyTranscript}>
               <Text style={styles.copyText}>Copy</Text>
             </TouchableOpacity>
           </View>
 
           <View style={styles.transcriptCard}>
-            <View style={styles.tsRow}>
-              <Text style={styles.tsTime}>00:04</Text>
-              <Text style={styles.tsText}>
-                Good morning, I&apos;m calling from the fraud department.
-              </Text>
-            </View>
-
-            <View style={styles.tsRow}>
-              <Text style={styles.tsTime}>00:11</Text>
-              <Text style={styles.tsText}>Which bank is this exactly?</Text>
-            </View>
-
-            <View style={styles.tsRow}>
-              <Text style={styles.tsTime}>00:16</Text>
-              <Text style={styles.tsText}>
-                Your account has been flagged. I need to verify a code sent to you.
-              </Text>
-            </View>
-
-            <View style={styles.tsRow}>
-              <Text style={styles.tsTime}>00:24</Text>
-              <Text style={styles.tsText}>I&apos;m not sharing any code.</Text>
-            </View>
+            {TRANSCRIPT_LINES.map((line, idx) => (
+              <View key={idx} style={styles.tsRow}>
+                <Text style={styles.tsTime}>{line.time}</Text>
+                <Text style={styles.tsText}>{line.text}</Text>
+              </View>
+            ))}
           </View>
         </ScrollView>
       </View>
@@ -157,9 +173,7 @@ const styles = StyleSheet.create({
     fontSize: 22,
     fontWeight: '700',
   },
-  scrollContent: {
-    paddingBottom: 40,
-  },
+  scrollContent: {},
   summaryCard: {
     backgroundColor: '#131316',
     borderRadius: 24,

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -12,16 +12,23 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
-import ScreenContainer from '../../components/layout/ScreenContainer';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import VoiceShieldCard from '../../components/cards/VoiceShieldCard';
 import RecentContactsScroll from '../../components/cards/RecentContactsScroll';
 import RecentCallList from '../../components/cards/RecentCallList';
 import FloatingCallButton from '../../components/buttons/FloatingCallButton';
 import { ROUTES } from '../../constants/routes';
+import { useContactsStore } from '../../store/contactsStore';
 import { colors } from '../../theme';
 
 export default function HomeScreen({ navigation }) {
+  const insets = useSafeAreaInsets();
   const [searchQuery, setSearchQuery] = useState('');
+  const { loadContacts } = useContactsStore();
+
+  useEffect(() => {
+    loadContacts();
+  }, []);
 
   const handleStartCall = () => {
     navigation.navigate(ROUTES.OUTGOING_CALL, {
@@ -80,7 +87,10 @@ export default function HomeScreen({ navigation }) {
 
         <ScrollView
           showsVerticalScrollIndicator={false}
-          contentContainerStyle={styles.scrollContent}
+          contentContainerStyle={[
+            styles.scrollContent,
+            { paddingBottom: Math.max(insets.bottom + 110, 120) },
+          ]}
         >
           {/* Search Input */}
           <View style={styles.searchContainer}>
@@ -92,6 +102,11 @@ export default function HomeScreen({ navigation }) {
               value={searchQuery}
               onChangeText={setSearchQuery}
             />
+            {searchQuery ? (
+              <TouchableOpacity onPress={() => setSearchQuery('')}>
+                <Ionicons name="close-circle" size={18} color={colors.textMuted} />
+              </TouchableOpacity>
+            ) : null}
           </View>
 
           {/* Voice Shield Live Card */}
@@ -201,7 +216,7 @@ const styles = StyleSheet.create({
     borderColor: '#22C55E',
   },
   scrollContent: {
-    paddingBottom: 110,
+    paddingTop: 4,
   },
   searchContainer: {
     flexDirection: 'row',
@@ -210,7 +225,7 @@ const styles = StyleSheet.create({
     borderRadius: 20,
     paddingHorizontal: 16,
     height: 50,
-    marginVertical: 12,
+    marginVertical: 10,
     borderWidth: 1,
     borderColor: 'rgba(255, 255, 255, 0.08)',
   },
