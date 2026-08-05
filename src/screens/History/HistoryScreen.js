@@ -115,7 +115,7 @@ export default function HistoryScreen({ navigation }) {
           </View>
         </ScrollView>
 
-        <FloatingCallButton onPress={() => navigation.navigate(ROUTES.OUTGOING_CALL, { contact: { name: 'New Call', initials: 'NC' } })} />
+        <FloatingCallButton onPress={() => navigation.navigate(ROUTES.KEYPAD)} />
       </View>
     </SafeAreaView>
   );

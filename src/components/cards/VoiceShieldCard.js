@@ -59,15 +59,7 @@ export default function VoiceShieldCard({ onStartCall }) {
         ))}
       </View>
 
-      {/* Call CTA Button */}
-      <TouchableOpacity
-        activeOpacity={0.85}
-        onPress={onStartCall}
-        style={styles.ctaButton}
-      >
-        <Ionicons name="call" size={18} color="#FFFFFF" style={styles.buttonIcon} />
-        <Text style={styles.ctaButtonText}>Start secure call</Text>
-      </TouchableOpacity>
+
     </View>
   );
 }

@@ -41,7 +41,7 @@ export default function HomeScreen({ navigation }) {
   }, []);
 
   const handleStartCall = () => {
-    navigation.navigate(ROUTES.CONTACTS);
+    navigation.navigate(ROUTES.KEYPAD);
   };
 
   const handleNotificationsPress = () => {

@@ -183,7 +183,7 @@ export default function SettingsScreen({ navigation }) {
           </TouchableOpacity>
         </ScrollView>
 
-        <FloatingCallButton onPress={() => navigation.navigate(ROUTES.OUTGOING_CALL, { contact: { name: displayName, initials, number: '' } })} />
+        <FloatingCallButton onPress={() => navigation.navigate(ROUTES.KEYPAD)} />
       </View>
     </SafeAreaView>
   );

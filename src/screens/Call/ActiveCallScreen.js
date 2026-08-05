@@ -12,6 +12,7 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { Audio } from 'expo-av';
 import Animated, {
   useSharedValue,
   useAnimatedStyle,
@@ -73,6 +74,8 @@ export default function ActiveCallScreen({ navigation, route }) {
   const [showAnalysisCard, setShowAnalysisCard] = useState(false);
   const [chunkCount, setChunkCount] = useState(0);
   const [analysisStopped, setAnalysisStopped] = useState(false);
+  const [showKeypad, setShowKeypad] = useState(false);
+  const [dtmfText, setDtmfText] = useState('');
 
   const storeContacts = useContactsStore((s) => s.contacts);
   const { authenticityScore, aiProbability, confidence, riskLevel, updateAnalysis, reset: resetAi } =
@@ -144,6 +147,22 @@ export default function ActiveCallScreen({ navigation, route }) {
     setIsMuted(next);
     audioChunker.setMuted(next);
   }, [isMuted]);
+
+  const handleToggleSpeaker = async () => {
+    try {
+      const next = !isSpeaker;
+      setIsSpeaker(next);
+      await Audio.setAudioModeAsync({
+        allowsRecordingIOS: true,
+        playsInSilentModeIOS: true,
+        staysActiveInBackground: true,
+        shouldDuckAndroid: true,
+        playThroughEarpieceAndroid: !next,
+      });
+    } catch (e) {
+      console.warn('Error setting audio mode:', e);
+    }
+  };
 
   const handleStopAnalysis = useCallback(() => {
     Alert.alert(
@@ -316,23 +335,60 @@ export default function ActiveCallScreen({ navigation, route }) {
 
           <TouchableOpacity
             activeOpacity={0.7}
-            onPress={() => setIsSpeaker(!isSpeaker)}
+            onPress={handleToggleSpeaker}
             style={[styles.controlBtn, isSpeaker && styles.controlBtnActive]}
           >
             <Ionicons name={isSpeaker ? 'volume-high' : 'volume-medium-outline'} size={24} color="#FFFFFF" />
             <Text style={styles.controlLabel}>Speaker</Text>
           </TouchableOpacity>
 
-          <TouchableOpacity activeOpacity={0.7} style={styles.controlBtn}>
+          <TouchableOpacity
+            activeOpacity={0.7}
+            onPress={() => setShowKeypad(true)}
+            style={[styles.controlBtn, showKeypad && styles.controlBtnActive]}
+          >
             <Ionicons name="keypad-outline" size={24} color="#FFFFFF" />
             <Text style={styles.controlLabel}>Keypad</Text>
           </TouchableOpacity>
 
-          <TouchableOpacity activeOpacity={0.7} style={styles.controlBtn}>
+          <TouchableOpacity
+            activeOpacity={0.7}
+            onPress={() => {
+              Alert.alert(
+                'Add Caller',
+                'Conference calling and secure bridge addition will be available once backend telephony is integrated.',
+                [{ text: 'OK' }]
+              );
+            }}
+            style={styles.controlBtn}
+          >
             <Ionicons name="person-add-outline" size={24} color="#FFFFFF" />
             <Text style={styles.controlLabel}>Add</Text>
           </TouchableOpacity>
         </View>
+
+        {/* DTMF Keypad Overlay */}
+        {showKeypad && (
+          <View style={styles.keypadOverlay}>
+            <View style={styles.keypadOverlayHeader}>
+              <Text style={styles.keypadOverlayTitle}>Keypad: {dtmfText}</Text>
+              <TouchableOpacity onPress={() => setShowKeypad(false)} style={styles.keypadCloseBtn}>
+                <Ionicons name="close-circle" size={24} color="#FFFFFF" />
+              </TouchableOpacity>
+            </View>
+            <View style={styles.keypadOverlayGrid}>
+              {['1', '2', '3', '4', '5', '6', '7', '8', '9', '*', '0', '#'].map((digit) => (
+                <TouchableOpacity
+                  key={digit}
+                  style={styles.keypadOverlayKey}
+                  onPress={() => setDtmfText((prev) => prev + digit)}
+                >
+                  <Text style={styles.keypadOverlayKeyText}>{digit}</Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+          </View>
+        )}
 
         {/* End Call */}
         <View style={styles.endCallArea}>
@@ -568,5 +624,54 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.4,
     shadowRadius: 12,
     elevation: 8,
+  },
+  keypadOverlay: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
+    backgroundColor: '#131316',
+    borderTopLeftRadius: 30,
+    borderTopRightRadius: 30,
+    padding: 20,
+    borderTopWidth: 1,
+    borderColor: 'rgba(255,255,255,0.1)',
+    zIndex: 1000,
+  },
+  keypadOverlayHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 16,
+  },
+  keypadOverlayTitle: {
+    color: '#FFFFFF',
+    fontSize: 18,
+    fontWeight: '700',
+  },
+  keypadCloseBtn: {
+    padding: 4,
+  },
+  keypadOverlayGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    justifyContent: 'center',
+    gap: 16,
+    paddingVertical: 12,
+  },
+  keypadOverlayKey: {
+    width: 68,
+    height: 68,
+    borderRadius: 34,
+    backgroundColor: '#18181B',
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.06)',
+  },
+  keypadOverlayKeyText: {
+    color: '#FFFFFF',
+    fontSize: 24,
+    fontWeight: '600',
   },
 });

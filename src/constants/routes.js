@@ -20,6 +20,7 @@ export const ROUTES = {
   ACTIVE_CALL: 'ActiveCall',
   CALL_DETAILS: 'CallDetails',
   CALL_SUMMARY: 'CallSummary',
+  KEYPAD: 'Keypad',
 
   // Other
   CONTACTS: 'Contacts',

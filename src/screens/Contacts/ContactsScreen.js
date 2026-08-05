@@ -188,7 +188,7 @@ export default function ContactsScreen({ navigation }) {
           </ScrollView>
         )}
 
-        <FloatingCallButton onPress={() => startCall(displayList[0] || FALLBACK_CONTACTS[0])} />
+        <FloatingCallButton onPress={() => navigation.navigate(ROUTES.KEYPAD)} />
       </View>
     </SafeAreaView>
   );

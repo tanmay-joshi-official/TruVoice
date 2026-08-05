@@ -17,6 +17,7 @@ import IncomingCallScreen from '../screens/Call/IncomingCallScreen';
 import ActiveCallScreen from '../screens/Call/ActiveCallScreen';
 import CallSummaryScreen from '../screens/Call/CallSummaryScreen';
 import CallDetailsScreen from '../screens/Call/CallDetailsScreen';
+import KeypadScreen from '../screens/Call/KeypadScreen';
 
 const Stack = createNativeStackNavigator();
 
@@ -111,6 +112,12 @@ export default function RootNavigator() {
         <Stack.Screen
           name={ROUTES.CALL_DETAILS}
           component={CallDetailsScreen}
+        />
+
+        <Stack.Screen
+          name={ROUTES.KEYPAD}
+          component={KeypadScreen}
+          options={{ animation: 'slide_from_bottom' }}
         />
       </Stack.Navigator>
     </NavigationContainer>
