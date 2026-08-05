@@ -7,14 +7,12 @@ class AudioChunkerService {
     this.chunkTimer = null;
     this.isChunking = false;
     this.isMuted = false;
+    this.isAnalysisStopped = false;
     this.chunkIndex = 0;
     this.onChunkCallback = null;
-    this.intervalMs = 5000;
+    this.intervalMs = 20000; // 20 second chunks for backend AI analysis
   }
 
-  /**
-   * Request mic permissions and prepare audio session for active VoIP recording
-   */
   async requestPermissions() {
     try {
       const response = await Audio.requestPermissionsAsync();
@@ -26,16 +24,14 @@ class AudioChunkerService {
   }
 
   /**
-   * Set Mic Mute state dynamically
+   * Mute/unmute mic — completely releases or re-acquires hardware
    */
   async setMuted(muted) {
     const wasMuted = this.isMuted;
     this.isMuted = !!muted;
-
     if (!this.isChunking) return;
 
     if (this.isMuted && !wasMuted) {
-      // User just muted: stop and discard current recording immediately
       if (this.recording) {
         try {
           const rec = this.recording;
@@ -45,24 +41,42 @@ class AudioChunkerService {
           if (uri) {
             await FileSystem.deleteAsync(uri, { idempotent: true });
           }
-        } catch (e) {
-          // Silent catch
-        }
+        } catch (e) { /* silent */ }
       }
-    } else if (!this.isMuted && wasMuted) {
-      // User just unmuted: start a fresh recording chunk immediately
+    } else if (!this.isMuted && wasMuted && !this.isAnalysisStopped) {
       await this._startRecordingChunk();
     }
   }
 
   /**
-   * Start 5-second audio chunking cycle
+   * Stop or resume AI analysis (user toggle for sensitive calls)
    */
-  async startChunking(onChunkCallback, intervalMs = 5000) {
-    if (this.isChunking) {
-      console.log('Audio chunker is already running.');
-      return true;
+  async setAnalysisStopped(stopped) {
+    this.isAnalysisStopped = !!stopped;
+    if (this.isAnalysisStopped) {
+      // Stop current recording chunk immediately
+      if (this.recording) {
+        try {
+          const rec = this.recording;
+          this.recording = null;
+          await rec.stopAndUnloadAsync();
+          const uri = rec.getURI();
+          if (uri) {
+            await FileSystem.deleteAsync(uri, { idempotent: true });
+          }
+        } catch (e) { /* silent */ }
+      }
+    } else if (!this.isMuted) {
+      // Resume recording
+      await this._startRecordingChunk();
     }
+  }
+
+  /**
+   * Start 20-second audio chunking cycle
+   */
+  async startChunking(onChunkCallback, intervalMs = 20000) {
+    if (this.isChunking) return true;
 
     const hasPermission = await this.requestPermissions();
     if (!hasPermission) {
@@ -75,6 +89,7 @@ class AudioChunkerService {
     this.chunkIndex = 0;
     this.isChunking = true;
     this.isMuted = false;
+    this.isAnalysisStopped = false;
 
     try {
       await Audio.setAudioModeAsync({
@@ -96,18 +111,18 @@ class AudioChunkerService {
   }
 
   /**
-   * Internal method to create and start a single recording instance (only if NOT muted)
+   * Record as AAC/.m4a — backend will receive high quality audio for AI analysis
    */
   async _startRecordingChunk() {
-    if (!this.isChunking || this.isMuted) {
+    if (!this.isChunking || this.isMuted || this.isAnalysisStopped) {
       this.recording = null;
       return;
     }
-    
+
     try {
       const recordingOptions = {
         android: {
-          extension: '.wav',
+          extension: '.m4a',
           outputFormat: Audio.AndroidOutputFormat.MPEG_4,
           audioEncoder: Audio.AndroidAudioEncoder.AAC,
           sampleRate: 16000,
@@ -115,7 +130,7 @@ class AudioChunkerService {
           bitRate: 128000,
         },
         ios: {
-          extension: '.wav',
+          extension: '.m4a',
           audioQuality: Audio.IOSAudioQuality.HIGH,
           sampleRate: 16000,
           numberOfChannels: 1,
@@ -134,9 +149,6 @@ class AudioChunkerService {
     }
   }
 
-  /**
-   * Sequential loop: Process/emit finished chunk and schedule the next
-   */
   _scheduleNextCycle() {
     if (!this.isChunking) return;
 
@@ -146,23 +158,33 @@ class AudioChunkerService {
       const currentRecording = this.recording;
       this.recording = null;
 
-      if (this.isMuted) {
-        // Muted cycle: emit silent/empty chunk info directly without touching hardware
+      if (this.isMuted || this.isAnalysisStopped) {
+        // Silent cycle
         if (this.onChunkCallback) {
           this.onChunkCallback({
             chunkIndex: this.chunkIndex,
+            fileUri: null,
             base64Data: null,
-            isMuted: true,
+            isMuted: this.isMuted,
+            isAnalysisStopped: this.isAnalysisStopped,
             timestamp: new Date().toISOString(),
             durationMs: this.intervalMs,
           });
         }
         this.chunkIndex += 1;
 
-        // Continue muted cycle
+        // Discard any lingering recording
+        if (currentRecording) {
+          try {
+            await currentRecording.stopAndUnloadAsync();
+            const uri = currentRecording.getURI();
+            if (uri) await FileSystem.deleteAsync(uri, { idempotent: true });
+          } catch (e) { /* silent */ }
+        }
+
         this._scheduleNextCycle();
       } else {
-        // Active cycle: stop previous recording, then start new recording chunk
+        // Active cycle: stop previous, emit, start next
         if (currentRecording) {
           await this._processAndEmitChunk(currentRecording, this.chunkIndex);
           this.chunkIndex += 1;
@@ -177,7 +199,7 @@ class AudioChunkerService {
   }
 
   /**
-   * Stop recording the completed chunk, read as Base64, emit callback, and delete file
+   * Stop recording, read file as Base64 for socket/HTTP upload, emit callback, cleanup
    */
   async _processAndEmitChunk(recordingInstance, index) {
     try {
@@ -196,21 +218,21 @@ class AudioChunkerService {
       const uri = recordingInstance.getURI();
 
       if (uri) {
-        let base64Data = null;
-        if (!this.isMuted) {
-          base64Data = await FileSystem.readAsStringAsync(uri, {
-            encoding: 'base64',
-          });
-        }
+        // Read file as Base64 for transmission
+        const base64Data = await FileSystem.readAsStringAsync(uri, {
+          encoding: 'base64',
+        });
 
         if (this.onChunkCallback) {
           this.onChunkCallback({
             chunkIndex: index,
+            fileUri: uri,
             base64Data,
-            isMuted: this.isMuted,
+            isMuted: false,
+            isAnalysisStopped: false,
             timestamp: new Date().toISOString(),
             durationMs: this.intervalMs,
-            fileUri: uri,
+            mimeType: 'audio/mp4', // .m4a with AAC encoding
           });
         }
 
@@ -221,9 +243,6 @@ class AudioChunkerService {
     }
   }
 
-  /**
-   * Stop the chunking engine and release mic resources
-   */
   async stopChunking() {
     this.isChunking = false;
 
@@ -236,35 +255,20 @@ class AudioChunkerService {
       try {
         const rec = this.recording;
         this.recording = null;
-        
         let isRecordingActive = false;
         try {
           const status = await rec.getStatusAsync();
           isRecordingActive = status.canRecord && status.isRecording;
-        } catch (e) {
-          isRecordingActive = true;
-        }
-
-        if (isRecordingActive) {
-          await rec.stopAndUnloadAsync();
-        }
-        
+        } catch (e) { isRecordingActive = true; }
+        if (isRecordingActive) await rec.stopAndUnloadAsync();
         const uri = rec.getURI();
-        if (uri) {
-          await FileSystem.deleteAsync(uri, { idempotent: true });
-        }
-      } catch (e) {
-        // Ignore
-      }
+        if (uri) await FileSystem.deleteAsync(uri, { idempotent: true });
+      } catch (e) { /* silent */ }
     }
 
     try {
-      await Audio.setAudioModeAsync({
-        allowsRecordingIOS: false,
-      });
-    } catch (e) {
-      // Ignore
-    }
+      await Audio.setAudioModeAsync({ allowsRecordingIOS: false });
+    } catch (e) { /* silent */ }
   }
 }
 

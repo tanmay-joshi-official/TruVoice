@@ -19,25 +19,29 @@ import RecentCallList from '../../components/cards/RecentCallList';
 import FloatingCallButton from '../../components/buttons/FloatingCallButton';
 import { ROUTES } from '../../constants/routes';
 import { useContactsStore } from '../../store/contactsStore';
+import { useAuthStore } from '../../store';
 import { colors } from '../../theme';
 
 export default function HomeScreen({ navigation }) {
   const insets = useSafeAreaInsets();
   const [searchQuery, setSearchQuery] = useState('');
   const { loadContacts } = useContactsStore();
+  const user = useAuthStore((s) => s.user);
+
+  const firstName = (user?.name || 'User').split(' ')[0];
+  const userInitials = (user?.name || 'U')
+    .split(' ')
+    .map((w) => w[0])
+    .join('')
+    .toUpperCase()
+    .slice(0, 2);
 
   useEffect(() => {
     loadContacts();
   }, []);
 
   const handleStartCall = () => {
-    navigation.navigate(ROUTES.OUTGOING_CALL, {
-      contact: {
-        name: 'Priya Nair',
-        number: '+1 415 890',
-        initials: 'PN',
-      },
-    });
+    navigation.navigate(ROUTES.CONTACTS);
   };
 
   const handleNotificationsPress = () => {
@@ -51,9 +55,9 @@ export default function HomeScreen({ navigation }) {
         {/* Header */}
         <View style={styles.header}>
           <View style={styles.headerTextContainer}>
-            <Text style={styles.greetingTitle}>Good morning, Aarav</Text>
+            <Text style={styles.greetingTitle}>Hi, {firstName}</Text>
             <Text style={styles.protectionSubtext}>
-              Protection active · 4 calls verified today
+              Protection active
             </Text>
           </View>
 
@@ -78,7 +82,7 @@ export default function HomeScreen({ navigation }) {
                 colors={['#3B82F6', '#6366F1']}
                 style={styles.avatarGradient}
               >
-                <Text style={styles.avatarText}>AM</Text>
+                <Text style={styles.avatarText}>{userInitials}</Text>
               </LinearGradient>
               <View style={styles.avatarStatusRing} />
             </TouchableOpacity>

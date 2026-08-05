@@ -17,9 +17,9 @@ import { colors } from '../../theme';
 export default function OutgoingCallScreen({ navigation, route }) {
   const insets = useSafeAreaInsets();
   const contact = route.params?.contact || {
-    name: 'Priya Nair',
-    number: '+1 415 890',
-    initials: 'PN',
+    name: 'Unknown Caller',
+    number: '',
+    initials: 'UC',
   };
 
   const [isMuted, setIsMuted] = useState(false);

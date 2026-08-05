@@ -16,25 +16,31 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Svg, { Path, Defs, LinearGradient as SvgGradient, Stop } from 'react-native-svg';
 import { ROUTES } from '../../constants/routes';
+import { useAiDetectionStore } from '../../store/aiDetectionStore';
 import { colors } from '../../theme';
 
-const TRANSCRIPT_LINES = [
-  { time: '00:04', text: "Good morning, I'm calling from the fraud department." },
-  { time: '00:11', text: 'Which bank is this exactly?' },
-  { time: '00:16', text: 'Your account has been flagged. I need to verify a code sent to you.' },
-  { time: '00:24', text: "I'm not sharing any code." },
-];
+// Transcript lines will come from backend speech-to-text
+// No hardcoded dummy data
 
 export default function CallSummaryScreen({ navigation, route }) {
   const insets = useSafeAreaInsets();
   const contact = route.params?.contact || {
     name: 'Unknown Caller',
-    number: '+1 415 220',
+    number: '',
     initials: 'UC',
   };
+  const isSavedContact = route.params?.isSavedContact || false;
+
+  const { authenticityScore, aiProbability } = useAiDetectionStore();
+  const transcriptLines = route.params?.transcript || [];
+  const callDuration = route.params?.duration || '--';
 
   const handleCopyTranscript = async () => {
-    const transcriptText = TRANSCRIPT_LINES
+    if (transcriptLines.length === 0) {
+      Alert.alert('No Transcript', 'Transcript data is not yet available.');
+      return;
+    }
+    const transcriptText = transcriptLines
       .map((line) => `[${line.time}] ${line.text}`)
       .join('\n');
     try {
@@ -78,23 +84,36 @@ export default function CallSummaryScreen({ navigation, route }) {
             </LinearGradient>
 
             <Text style={styles.callerName}>{contact.name || 'Unknown Caller'}</Text>
-            <Text style={styles.callMeta}>03:12 · Today 08:41</Text>
+            <Text style={styles.callMeta}>{callDuration}</Text>
 
-            <View style={styles.syntheticBadge}>
-              <Text style={styles.syntheticText}>Synthetic voice</Text>
-            </View>
+            {!isSavedContact && (
+              <View style={[styles.syntheticBadge, aiProbability < 40 && { backgroundColor: 'rgba(34, 197, 94, 0.15)' }]}>
+                <Text style={[styles.syntheticText, aiProbability < 40 && { color: '#22C55E' }]}>
+                  {aiProbability > 60 ? 'Synthetic voice' : aiProbability > 30 ? 'Suspicious' : 'Verified human'}
+                </Text>
+              </View>
+            )}
+            {isSavedContact && (
+              <View style={[styles.syntheticBadge, { backgroundColor: 'rgba(34, 197, 94, 0.15)' }]}>
+                <Text style={[styles.syntheticText, { color: '#22C55E' }]}>Saved contact</Text>
+              </View>
+            )}
           </View>
 
           {/* Metric Cards Row */}
           <View style={styles.metricsRow}>
             <View style={styles.metricCard}>
               <Text style={styles.metricLabel}>AVG AUTHENTICITY</Text>
-              <Text style={styles.metricValueDanger}>18%</Text>
+              <Text style={[styles.metricValueDanger, authenticityScore > 60 && { color: '#22C55E' }]}>
+                {isSavedContact ? 'N/A' : `${authenticityScore}%`}
+              </Text>
             </View>
 
             <View style={styles.metricCard}>
               <Text style={styles.metricLabel}>MAX AI PROB.</Text>
-              <Text style={styles.metricValueDanger}>94%</Text>
+              <Text style={[styles.metricValueDanger, aiProbability < 40 && { color: '#22C55E' }]}>
+                {isSavedContact ? 'N/A' : `${aiProbability}%`}
+              </Text>
             </View>
           </View>
 
@@ -130,12 +149,16 @@ export default function CallSummaryScreen({ navigation, route }) {
           </View>
 
           <View style={styles.transcriptCard}>
-            {TRANSCRIPT_LINES.map((line, idx) => (
+            {transcriptLines.length > 0 ? transcriptLines.map((line, idx) => (
               <View key={idx} style={styles.tsRow}>
                 <Text style={styles.tsTime}>{line.time}</Text>
                 <Text style={styles.tsText}>{line.text}</Text>
               </View>
-            ))}
+            )) : (
+              <Text style={{ color: colors.textMuted, fontSize: 13, textAlign: 'center' }}>
+                Transcript will be available once backend speech-to-text is connected.
+              </Text>
+            )}
           </View>
         </ScrollView>
       </View>

@@ -24,8 +24,8 @@ export default function SettingsScreen({ navigation }) {
   const logout = useAuthStore((state) => state.logout);
 
   // Derive display values from auth store user, with fallbacks
-  const displayName = user?.name || 'Aarav Mehta';
-  const displayEmail = user?.email || 'aarav@truvoice.app';
+  const displayName = user?.name || 'TruVoice User';
+  const displayEmail = user?.email || '';
   const initials = displayName
     .split(' ')
     .map((w) => w[0])
@@ -55,7 +55,7 @@ export default function SettingsScreen({ navigation }) {
   };
 
   const handleSubscription = () => {
-    Alert.alert('Subscription', 'TruVoice Pro is active.\n\nRenews on 12 Aug.\nManage your plan from the backend dashboard once connected.');
+    Alert.alert('Subscription', 'No active subscription.\n\nSubscription plans will be available once the backend is connected.');
   };
 
   const handleSecuritySettings = () => {
@@ -73,9 +73,11 @@ export default function SettingsScreen({ navigation }) {
         {/* Header */}
         <View style={styles.header}>
           <Text style={styles.title}>Profile</Text>
-          <View style={styles.proBadge}>
-            <Text style={styles.proText}>Pro</Text>
-          </View>
+          {user?.isPro && (
+            <View style={styles.proBadge}>
+              <Text style={styles.proText}>Pro</Text>
+            </View>
+          )}
         </View>
 
         <ScrollView
@@ -97,54 +99,31 @@ export default function SettingsScreen({ navigation }) {
             <Text style={styles.userName}>{displayName}</Text>
             <Text style={styles.userEmail}>{displayEmail}</Text>
 
-            {/* Stats Row */}
+            {/* Stats Row — populated from backend once connected */}
             <View style={styles.statsRow}>
               <View style={styles.statItem}>
-                <Text style={styles.statNumber}>128</Text>
+                <Text style={styles.statNumber}>0</Text>
                 <Text style={styles.statLabel}>Trusted</Text>
               </View>
               <View style={styles.statDivider} />
               <View style={styles.statItem}>
-                <Text style={styles.statNumber}>7</Text>
+                <Text style={styles.statNumber}>0</Text>
                 <Text style={styles.statLabel}>Blocked</Text>
               </View>
               <View style={styles.statDivider} />
               <View style={styles.statItem}>
-                <Text style={styles.statNumber}>42h</Text>
+                <Text style={styles.statNumber}>0h</Text>
                 <Text style={styles.statLabel}>Protected</Text>
               </View>
             </View>
           </View>
 
-          {/* Achievements Section */}
+          {/* Achievements Section — unlocked via backend when milestones are reached */}
           <Text style={styles.sectionTitle}>Achievements</Text>
-          <View style={styles.achievementsRow}>
-            <TouchableOpacity
-              activeOpacity={0.7}
-              onPress={() => Alert.alert('Scam Slayer', 'Blocked 5+ synthetic voice calls. You are protecting yourself from AI scams!')}
-              style={styles.achievementCard}
-            >
-              <Ionicons name="ribbon-outline" size={24} color="#EF4444" style={styles.achIcon} />
-              <Text style={styles.achTitle}>Scam Slayer</Text>
-            </TouchableOpacity>
-
-            <TouchableOpacity
-              activeOpacity={0.7}
-              onPress={() => Alert.alert('Verified 100', '100+ calls verified as authentic human speech. Your network is trusted.')}
-              style={styles.achievementCard}
-            >
-              <Ionicons name="ribbon-outline" size={24} color="#22C55E" style={styles.achIcon} />
-              <Text style={styles.achTitle}>Verified 100</Text>
-            </TouchableOpacity>
-
-            <TouchableOpacity
-              activeOpacity={0.7}
-              onPress={() => Alert.alert('Early Access', 'You are among the first TruVoice users. Thank you for your trust!')}
-              style={styles.achievementCard}
-            >
-              <Ionicons name="ribbon-outline" size={24} color="#3B82F6" style={styles.achIcon} />
-              <Text style={styles.achTitle}>Early Access</Text>
-            </TouchableOpacity>
+          <View style={styles.emptyAchievements}>
+            <Ionicons name="ribbon-outline" size={28} color={colors.textMuted} style={{ marginBottom: 8 }} />
+            <Text style={styles.emptyAchText}>No achievements yet</Text>
+            <Text style={styles.emptyAchSub}>Make calls through TruVoice to unlock badges</Text>
           </View>
 
           {/* Menu Options */}
@@ -156,7 +135,7 @@ export default function SettingsScreen({ navigation }) {
                 </View>
                 <View>
                   <Text style={styles.menuTitle}>Subscription</Text>
-                  <Text style={styles.menuSubtitle}>Pro · renews 12 Aug</Text>
+                  <Text style={styles.menuSubtitle}>No active plan</Text>
                 </View>
               </View>
               <Ionicons name="chevron-forward" size={18} color={colors.textMuted} />
@@ -331,22 +310,24 @@ const styles = StyleSheet.create({
     gap: 10,
     marginBottom: 20,
   },
-  achievementCard: {
-    flex: 1,
+  emptyAchievements: {
     backgroundColor: '#131316',
     borderRadius: 20,
-    padding: 16,
+    padding: 24,
     alignItems: 'center',
     borderWidth: 1,
     borderColor: 'rgba(255, 255, 255, 0.08)',
+    marginBottom: 20,
   },
-  achIcon: {
-    marginBottom: 8,
-  },
-  achTitle: {
+  emptyAchText: {
     color: '#FFFFFF',
-    fontSize: 12,
+    fontSize: 15,
     fontWeight: '600',
+  },
+  emptyAchSub: {
+    color: colors.textMuted,
+    fontSize: 12,
+    marginTop: 4,
     textAlign: 'center',
   },
   menuCard: {

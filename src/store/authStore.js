@@ -61,8 +61,8 @@ export const useAuthStore = create((set) => ({
       isLoading: false,
       user: {
         id: '1',
-        name: 'Aarav Mehta',
-        email: email || 'aarav@truvoice.app',
+        name: email ? email.split('@')[0] : 'User',
+        email: email || '',
         avatar: null,
       },
     });
@@ -101,8 +101,8 @@ export const useAuthStore = create((set) => ({
       isLoading: false,
       user: {
         id: '1',
-        name: 'Aarav Mehta',
-        email: 'aarav@truvoice.app',
+        name: 'User',
+        email: '',
       },
     });
 

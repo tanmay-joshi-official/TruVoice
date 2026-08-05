@@ -50,7 +50,7 @@ export default function VoiceShieldCard({ onStartCall }) {
       </View>
 
       <Text style={styles.cardTitle}>Voice shield is live</Text>
-      <Text style={styles.cardSubtitle}>Analyzing every 5s of every call</Text>
+      <Text style={styles.cardSubtitle}>Analyzing every 20s of every call</Text>
 
       {/* Live Waveform animation */}
       <View style={styles.waveformContainer}>

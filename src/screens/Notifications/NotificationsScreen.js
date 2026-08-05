@@ -16,52 +16,9 @@ import FloatingCallButton from '../../components/buttons/FloatingCallButton';
 import { ROUTES } from '../../constants/routes';
 import { colors } from '../../theme';
 
-const INITIAL_NOTIFICATIONS = [
-  {
-    id: 'n1',
-    title: 'Synthetic voice detected',
-    description: 'Call from +1 415 220 flagged at 91% AI probability.',
-    time: '2m',
-    icon: 'warning-outline',
-    iconColor: '#EF4444',
-    iconBg: 'rgba(239, 68, 68, 0.15)',
-    read: false,
-    targetRoute: ROUTES.CALL_DETAILS,
-  },
-  {
-    id: 'n2',
-    title: 'Call verified human',
-    description: 'Priya Nair · 97% authenticity across 12 minutes.',
-    time: '1h',
-    icon: 'shield-checkmark-outline',
-    iconColor: '#22C55E',
-    iconBg: 'rgba(34, 197, 94, 0.15)',
-    read: false,
-    targetRoute: ROUTES.CALL_SUMMARY,
-  },
-  {
-    id: 'n3',
-    title: 'Missed secure call',
-    description: 'Marcus Hale tried to reach you twice.',
-    time: '5h',
-    icon: 'call-outline',
-    iconColor: '#F59E0B',
-    iconBg: 'rgba(245, 158, 11, 0.15)',
-    read: false,
-    targetRoute: ROUTES.OUTGOING_CALL,
-  },
-  {
-    id: 'n4',
-    title: 'Detection model updated',
-    description: 'v2.4 improves prosody analysis on noisy lines.',
-    time: '1d',
-    icon: 'download-outline',
-    iconColor: '#3B82F6',
-    iconBg: 'rgba(59, 130, 246, 0.15)',
-    read: false,
-    targetRoute: null,
-  },
-];
+// Real notifications will be populated from backend push/socket events
+// No hardcoded dummy data
+const INITIAL_NOTIFICATIONS = [];
 
 export default function NotificationsScreen({ navigation }) {
   const insets = useSafeAreaInsets();
@@ -163,7 +120,7 @@ export default function NotificationsScreen({ navigation }) {
           </View>
         </ScrollView>
 
-        <FloatingCallButton onPress={() => navigation.navigate(ROUTES.OUTGOING_CALL, { contact: { name: 'Priya Nair' } })} />
+        <FloatingCallButton onPress={() => navigation.navigate(ROUTES.CONTACTS)} />
       </View>
     </SafeAreaView>
   );

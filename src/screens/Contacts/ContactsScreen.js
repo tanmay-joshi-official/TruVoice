@@ -20,15 +20,7 @@ import { ROUTES } from '../../constants/routes';
 import { useContactsStore } from '../../store/contactsStore';
 import { colors } from '../../theme';
 
-// Fallback contact list when device contacts are empty or permission pending
-const FALLBACK_CONTACTS = [
-  { id: 'fb1', name: 'Riya Kapoor', number: '+1 415 901', handle: '@riya', initials: 'RK', colors: ['#F97316', '#EC4899'], isOnline: true, status: 'Online' },
-  { id: 'fb2', name: 'Priya Nair', number: '+1 415 890', handle: '@priya', initials: 'PN', colors: ['#3B82F6', '#6366F1'], isOnline: true, status: 'Online' },
-  { id: 'fb3', name: 'Daniel Okafor', number: '+1 415 772', handle: '@dokafor', initials: 'DO', colors: ['#8B5CF6', '#3B82F6'], isOnline: false, status: 'Last seen 2h ago' },
-  { id: 'fb4', name: 'Elena Voss', number: '+1 415 654', handle: '@evoss', initials: 'EV', colors: ['#EC4899', '#F97316'], isOnline: true, status: 'Online' },
-  { id: 'fb5', name: 'Farah Idris', number: '+1 415 331', handle: '@farah', initials: 'FI', colors: ['#3B82F6', '#22C55E'], isOnline: false, status: 'Last seen 2h ago' },
-  { id: 'fb6', name: 'Kenji Sato', number: '+1 415 119', handle: '@kenji', initials: 'KS', colors: ['#6366F1', '#A855F7'], isOnline: false, status: 'Last seen 2h ago' },
-];
+// No fallback/dummy contacts — only real device contacts are displayed
 
 export default function ContactsScreen({ navigation }) {
   const insets = useSafeAreaInsets();
@@ -39,7 +31,7 @@ export default function ContactsScreen({ navigation }) {
     loadContacts();
   }, []);
 
-  const displayList = (contacts && contacts.length > 0 ? contacts : FALLBACK_CONTACTS).filter(
+  const displayList = (contacts || []).filter(
     (c) =>
       c.name.toLowerCase().includes(search.toLowerCase()) ||
       c.number.toLowerCase().includes(search.toLowerCase())

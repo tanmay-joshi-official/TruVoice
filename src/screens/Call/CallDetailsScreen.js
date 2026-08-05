@@ -16,19 +16,17 @@ import FloatingCallButton from '../../components/buttons/FloatingCallButton';
 import { ROUTES } from '../../constants/routes';
 import { colors } from '../../theme';
 
-const RISK_EVENTS = [
-  { id: '1', time: '00:29', label: 'Flat pitch variation', type: 'warning' },
-  { id: '2', time: '00:41', label: 'Robotic cadence', type: 'warning' },
-  { id: '3', time: '01:02', label: 'Synthetic prosody confirmed', type: 'danger' },
-  { id: '4', time: '01:18', label: 'OTP request detected', type: 'danger' },
-];
-
-const AI_EXPLANATION =
-  "The speaker's fundamental frequency stayed within a 6 Hz band for 87% of the call — natural speech typically varies 3–4× more. Combined with absent breath noise and uniform phoneme timing, the model classified voice as synthetic with 96% confidence.";
+// Risk events and AI explanation will come from backend analysis
+// No hardcoded dummy data
 
 export default function CallDetailsScreen({ navigation, route }) {
   const insets = useSafeAreaInsets();
   const call = route.params?.call || {};
+  const riskEvents = call.riskEvents || [];
+  const aiExplanation = call.aiExplanation || '';
+  const authenticityScore = call.authenticityScore ?? '--';
+  const callTime = call.time || '--';
+  const callDuration = call.duration || '--';
 
   const handleReportScam = () => {
     Alert.alert(
@@ -67,7 +65,7 @@ export default function CallDetailsScreen({ navigation, route }) {
           </TouchableOpacity>
           <View>
             <Text style={styles.headerTitle}>Call details</Text>
-            <Text style={styles.headerSub}>Today · 08:41 · 03:12</Text>
+            <Text style={styles.headerSub}>{callTime} · {callDuration}</Text>
           </View>
         </View>
 
@@ -82,15 +80,15 @@ export default function CallDetailsScreen({ navigation, route }) {
           <View style={styles.gaugeSection}>
             <View style={styles.gaugeCircle}>
               <Text style={styles.gaugeLabel}>AUTHENTICITY</Text>
-              <Text style={styles.gaugeValue}>18%</Text>
-              <Text style={styles.gaugeSub}>AI Detected</Text>
+              <Text style={styles.gaugeValue}>{authenticityScore}%</Text>
+              <Text style={styles.gaugeSub}>{typeof authenticityScore === 'number' && authenticityScore < 40 ? 'AI Detected' : 'Pending'}</Text>
             </View>
           </View>
 
           {/* Risk Events List */}
           <Text style={styles.sectionTitle}>Risk events</Text>
           <View style={styles.card}>
-            {RISK_EVENTS.map((event) => (
+            {riskEvents.length > 0 ? riskEvents.map((event) => (
               <TouchableOpacity
                 key={event.id}
                 activeOpacity={0.7}
@@ -108,13 +106,15 @@ export default function CallDetailsScreen({ navigation, route }) {
                 <Text style={styles.eventTime}>{event.time}</Text>
                 <Text style={styles.eventLabel}>{event.label}</Text>
               </TouchableOpacity>
-            ))}
+            )) : (
+              <Text style={{ color: colors.textMuted, fontSize: 13, textAlign: 'center' }}>No risk events detected</Text>
+            )}
           </View>
 
           {/* AI Explanation Card */}
           <Text style={styles.sectionTitle}>AI explanation</Text>
           <View style={styles.card}>
-            <Text style={styles.explanationText}>{AI_EXPLANATION}</Text>
+            <Text style={styles.explanationText}>{aiExplanation || 'AI explanation will be available once call analysis is complete.'}</Text>
           </View>
 
           {/* Action Buttons */}
@@ -139,7 +139,7 @@ export default function CallDetailsScreen({ navigation, route }) {
           </View>
         </ScrollView>
 
-        <FloatingCallButton onPress={() => navigation.navigate(ROUTES.OUTGOING_CALL, { contact: { name: 'Priya Nair', initials: 'PN', number: '+1 415 890' } })} />
+        <FloatingCallButton onPress={() => navigation.navigate(ROUTES.CONTACTS)} />
       </View>
     </SafeAreaView>
   );
