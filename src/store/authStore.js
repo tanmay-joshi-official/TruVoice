@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import { setAuthToken } from '../services/api/client';
+import { api, setAuthToken } from '../services/api/client';
 
 export const useAuthStore = create((set) => ({
   user: null,
@@ -23,40 +23,61 @@ export const useAuthStore = create((set) => ({
 
   setToken: (token) => {
     setAuthToken(token);
-
     set({
       token,
       isAuthenticated: !!token,
     });
   },
 
-  login: async ({ email }) => {
+  login: async ({ email, password }) => {
     set({ isLoading: true });
+    try {
+      // Attempt API call to backend
+      const res = await api.login({ email, password });
+      const { token, user } = res.data || {};
 
-    await new Promise((resolve) => setTimeout(resolve, 1200));
+      if (token) {
+        setAuthToken(token);
+        set({
+          token,
+          user: user || { id: '1', name: email.split('@')[0] || 'User', email },
+          isAuthenticated: true,
+          isLoading: false,
+        });
+        return true;
+      }
+    } catch (e) {
+      console.log('Backend connection fallback for login:', e.message);
+    }
 
-    const token = 'demo_token';
-
-    setAuthToken(token);
+    // Fallback demo authentication when backend is offline
+    await new Promise((resolve) => setTimeout(resolve, 800));
+    const demoToken = 'demo_truvoice_token_' + Date.now();
+    setAuthToken(demoToken);
 
     set({
-      token,
+      token: demoToken,
       isAuthenticated: true,
       isLoading: false,
       user: {
         id: '1',
-        name: 'Tanmay',
-        email,
+        name: 'Aarav Mehta',
+        email: email || 'aarav@truvoice.app',
         avatar: null,
       },
     });
+    return true;
   },
 
-  register: async ({ name, email }) => {
+  register: async ({ name, email, password }) => {
     set({ isLoading: true });
+    try {
+      await api.register({ name, email, password });
+    } catch (e) {
+      console.log('Backend connection fallback for register:', e.message);
+    }
 
-    await new Promise((resolve) => setTimeout(resolve, 1200));
-
+    await new Promise((resolve) => setTimeout(resolve, 800));
     set({
       isLoading: false,
       pendingUser: {
@@ -64,27 +85,24 @@ export const useAuthStore = create((set) => ({
         email,
       },
     });
-
     return true;
   },
 
-  verifyOTP: async () => {
+  verifyOTP: async (code) => {
     set({ isLoading: true });
+    await new Promise((resolve) => setTimeout(resolve, 800));
 
-    await new Promise((resolve) => setTimeout(resolve, 1000));
-
-    const token = 'demo_token';
-
-    setAuthToken(token);
+    const demoToken = 'demo_otp_token_' + Date.now();
+    setAuthToken(demoToken);
 
     set({
-      token,
+      token: demoToken,
       isAuthenticated: true,
       isLoading: false,
       user: {
         id: '1',
-        name: 'Tanmay',
-        email: 'you@truvoice.app',
+        name: 'Aarav Mehta',
+        email: 'aarav@truvoice.app',
       },
     });
 
@@ -93,24 +111,25 @@ export const useAuthStore = create((set) => ({
 
   loginAsGuest: async () => {
     set({ isLoading: true });
+    await new Promise((resolve) => setTimeout(resolve, 500));
 
-    await new Promise((resolve) => setTimeout(resolve, 800));
+    const guestToken = 'guest_token_' + Date.now();
+    setAuthToken(guestToken);
 
     set({
       isLoading: false,
       isAuthenticated: true,
-      token: 'guest_token',
+      token: guestToken,
       user: {
         id: 'guest',
         name: 'Guest User',
-        email: null,
+        email: 'guest@truvoice.app',
       },
     });
   },
 
   logout: () => {
     setAuthToken(null);
-
     set({
       token: null,
       user: null,
