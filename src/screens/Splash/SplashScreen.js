@@ -1,4 +1,4 @@
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { View, Text } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -7,17 +7,39 @@ import ProgressBar from '../../components/common/ProgressBar';
 import ScreenContainer from '../../components/layout/ScreenContainer';
 import { ROUTES } from '../../constants/routes';
 import { config } from '../../constants/config';
+import { useAuthStore } from '../../store/authStore';
 
 export default function SplashScreen() {
   const navigation = useNavigation();
+  const hydrate = useAuthStore((s) => s.hydrate);
+  const isHydrated = useAuthStore((s) => s.isHydrated);
+  const isAuthenticated = useAuthStore((s) => s.isAuthenticated);
+  const hasOnboarded = useAuthStore((s) => s.hasOnboarded);
+  const [minElapsed, setMinElapsed] = useState(false);
 
   useEffect(() => {
-    const timer = setTimeout(() => {
-      navigation.replace(ROUTES.ONBOARDING);
-    }, config.splashDuration);
-
+    const timer = setTimeout(() => setMinElapsed(true), config.splashDuration);
+    hydrate();
     return () => clearTimeout(timer);
-  }, [navigation]);
+  }, [hydrate]);
+
+  useEffect(() => {
+    if (!minElapsed || !isHydrated) return;
+
+    let nextRoute;
+    if (isAuthenticated) {
+      nextRoute = ROUTES.MAIN_TABS;
+    } else if (hasOnboarded) {
+      nextRoute = ROUTES.LOGIN;
+    } else {
+      nextRoute = ROUTES.ONBOARDING;
+    }
+
+    navigation.reset({
+      index: 0,
+      routes: [{ name: nextRoute }],
+    });
+  }, [minElapsed, isHydrated, isAuthenticated, hasOnboarded, navigation]);
 
   return (
     <ScreenContainer withGlow edges={['top', 'bottom']}>

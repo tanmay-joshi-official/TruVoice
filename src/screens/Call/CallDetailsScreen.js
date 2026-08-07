@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect, useState, useCallback } from 'react';
 import {
   View,
   Text,
@@ -9,34 +9,99 @@ import {
   StatusBar,
   Platform,
   Alert,
+  ActivityIndicator,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import FloatingCallButton from '../../components/buttons/FloatingCallButton';
 import { ROUTES } from '../../constants/routes';
 import { colors } from '../../theme';
-
-// Risk events and AI explanation will come from backend analysis
-// No hardcoded dummy data
+import { analysisService } from '../../services/analysis/analysisService';
 
 export default function CallDetailsScreen({ navigation, route }) {
   const insets = useSafeAreaInsets();
   const call = route.params?.call || {};
-  const riskEvents = call.riskEvents || [];
-  const aiExplanation = call.aiExplanation || '';
-  const authenticityScore = call.authenticityScore ?? '--';
-  const callTime = call.time || '--';
+
+  const callerNumber = call.callerNumber || call.caller_number || call.number || '';
+  const riskEvents = call.riskEvents || call.flaggedKeywords?.map((k, i) => ({
+    id: `kw-${i}`,
+    time: '--:--',
+    label: k,
+    type: (call.unifiedRiskScore || call.unified_risk_score || 0) >= 70 ? 'danger' : 'warning',
+  })) || [];
+  const aiExplanation = call.aiExplanation || call.reasoning || '';
+  const authenticityScore = call.authenticityScore ?? (call.ai_voice_probability != null ? Math.max(0, 100 - Math.round(call.ai_voice_probability)) : '--');
+  const aiProbability = call.aiProbability ?? Math.round(call.ai_voice_probability ?? 0);
+  const unifiedRiskScore = call.unifiedRiskScore ?? Math.round(call.unified_risk_score ?? 0);
+  const riskLevelLabel = call.riskLevelLabel || call.risk_level || 'LOW RISK';
+  const scamCategory = call.scamCategory || call.scam_category || '';
+  const callTime = call.time || '--:--';
   const callDuration = call.duration || '--';
+  const callName = call.name || call.callerNumber || call.number || 'Unknown Caller';
+  const initials = call.initials || (call.callerNumber || call.number || 'UC').replace(/\D/g, '').slice(-2) || 'UC';
+  const transcript = call.transcript || call.transcriptLines || [];
+
+  const [spamStatus, setSpamStatus] = useState(null);
+  const [spamLoading, setSpamLoading] = useState(false);
+  const [reportingSpam, setReportingSpam] = useState(false);
+
+  const loadSpamStatus = useCallback(async () => {
+    if (!callerNumber) return;
+    setSpamLoading(true);
+    try {
+      const status = await analysisService.checkSpamStatus(callerNumber);
+      setSpamStatus(status);
+    } catch (err) {
+      console.warn('Spam status failed:', err.message);
+    } finally {
+      setSpamLoading(false);
+    }
+  }, [callerNumber]);
+
+  useEffect(() => {
+    loadSpamStatus();
+  }, [loadSpamStatus]);
 
   const handleReportScam = () => {
     Alert.alert(
-      'Report Scam',
-      'This call will be reported and added to TruVoice threat intelligence.\n\nOnce the backend is connected, this data will be securely submitted.',
+      'Report as Spam',
+      `Report ${callerNumber || 'this number'} as spam to TruVoice threat intelligence?\n\nThis will flag the number for other users.`,
       [
         { text: 'Cancel', style: 'cancel' },
-        { text: 'Report', style: 'destructive', onPress: () => Alert.alert('Reported', 'Scam report queued for submission.') },
+        {
+          text: 'Report',
+          style: 'destructive',
+          onPress: async () => {
+            setReportingSpam(true);
+            try {
+              const result = await analysisService.reportSpam(callerNumber);
+              setSpamStatus(result);
+              Alert.alert(
+                'Reported',
+                `Spam report recorded.\nReport count: ${result.report_count}\nMarked spam: ${result.is_spam ? 'Yes' : 'Not yet (needs 20 reports)'}`,
+              );
+            } catch (err) {
+              Alert.alert('Report failed', err.message || 'Could not submit spam report.');
+            } finally {
+              setReportingSpam(false);
+            }
+          },
+        },
       ],
     );
+  };
+
+  const handleFileComplaint = () => {
+    navigation.navigate(ROUTES.REPORT_SCAM, {
+      phone_number: callerNumber,
+      call_id: call.id,
+      call_summary: {
+        scamCategory,
+        riskLevelLabel,
+        unifiedRiskScore,
+        aiExplanation,
+      },
+    });
   };
 
   const handleBlockCaller = () => {
@@ -45,16 +110,25 @@ export default function CallDetailsScreen({ navigation, route }) {
       'Are you sure you want to block this caller? Future calls from this number will be automatically declined.',
       [
         { text: 'Cancel', style: 'cancel' },
-        { text: 'Block', style: 'destructive', onPress: () => Alert.alert('Blocked', 'Caller has been added to your block list.') },
+        {
+          text: 'Block',
+          style: 'destructive',
+          onPress: () => Alert.alert('Blocked', 'Caller has been added to your block list.'),
+        },
       ],
     );
+  };
+
+  const getRiskColor = () => {
+    if (unifiedRiskScore > 60) return '#EF4444';
+    if (unifiedRiskScore > 30) return '#F59E0B';
+    return '#22C55E';
   };
 
   return (
     <SafeAreaView style={styles.safeArea}>
       <StatusBar barStyle="light-content" backgroundColor="#09090B" />
       <View style={styles.container}>
-        {/* Header */}
         <View style={styles.header}>
           <TouchableOpacity
             onPress={() => navigation.goBack()}
@@ -76,24 +150,94 @@ export default function CallDetailsScreen({ navigation, route }) {
             { paddingBottom: Math.max(insets.bottom + 110, 120) },
           ]}
         >
-          {/* Authenticity Red Radial Ring */}
+          <View style={styles.callerHeader}>
+            <View style={[styles.callerAvatar, { borderColor: getRiskColor() }]}>
+              <Text style={styles.callerAvatarText}>{initials}</Text>
+            </View>
+            <Text style={styles.callerName}>{callName}</Text>
+            {callerNumber ? <Text style={styles.callerNumber}>{callerNumber}</Text> : null}
+            <View style={[styles.riskBadge, { backgroundColor: `${getRiskColor()}22`, borderColor: `${getRiskColor()}55` }]}>
+              <Ionicons
+                name={unifiedRiskScore > 60 ? 'warning' : unifiedRiskScore > 30 ? 'alert-circle' : 'shield-checkmark'}
+                size={14}
+                color={getRiskColor()}
+                style={{ marginRight: 6 }}
+              />
+              <Text style={[styles.riskBadgeText, { color: getRiskColor() }]}>{riskLevelLabel}</Text>
+            </View>
+
+            {spamLoading ? (
+              <View style={styles.spamRow}>
+                <ActivityIndicator size="small" color={colors.textMuted} />
+              </View>
+            ) : spamStatus ? (
+              <View style={styles.spamRow}>
+                <Ionicons
+                  name={spamStatus.is_spam ? 'alert-circle' : 'shield-checkmark-outline'}
+                  size={14}
+                  color={spamStatus.is_spam ? '#EF4444' : '#22C55E'}
+                  style={{ marginRight: 6 }}
+                />
+                <Text style={[styles.spamText, { color: spamStatus.is_spam ? '#EF4444' : '#22C55E' }]}>
+                  {spamStatus.is_spam ? 'Marked as spam by community' : `Community reports: ${spamStatus.report_count}`}
+                </Text>
+              </View>
+            ) : null}
+          </View>
+
           <View style={styles.gaugeSection}>
-            <View style={styles.gaugeCircle}>
-              <Text style={styles.gaugeLabel}>AUTHENTICITY</Text>
-              <Text style={styles.gaugeValue}>{authenticityScore}%</Text>
-              <Text style={styles.gaugeSub}>{typeof authenticityScore === 'number' && authenticityScore < 40 ? 'AI Detected' : 'Pending'}</Text>
+            <View style={[styles.gaugeCircle, {
+              borderColor: getRiskColor(),
+              borderTopColor: 'rgba(255,255,255,0.1)',
+              borderRightColor: 'rgba(255,255,255,0.1)',
+            }]}>
+              <Text style={[styles.gaugeLabel, { color: getRiskColor() }]}>AUTHENTICITY</Text>
+              <Text style={[styles.gaugeValue, { color: getRiskColor() }]}>
+                {typeof authenticityScore === 'number' ? `${authenticityScore}%` : authenticityScore}
+              </Text>
+              <Text style={[styles.gaugeSub, { color: getRiskColor() }]}>
+                {typeof authenticityScore === 'number' && authenticityScore < 40
+                  ? 'AI Detected'
+                  : typeof authenticityScore === 'number' && authenticityScore < 70
+                    ? 'Suspicious'
+                    : 'Likely Human'}
+              </Text>
             </View>
           </View>
 
-          {/* Risk Events List */}
+          <View style={styles.metricsRow}>
+            <View style={styles.metricCard}>
+              <Text style={styles.metricLabel}>AI PROBABILITY</Text>
+              <Text style={[styles.metricValue, { color: aiProbability > 50 ? '#EF4444' : '#22C55E' }]}>
+                {aiProbability}%
+              </Text>
+            </View>
+            <View style={styles.metricCard}>
+              <Text style={styles.metricLabel}>RISK SCORE</Text>
+              <Text style={[styles.metricValue, { color: getRiskColor() }]}>
+                {unifiedRiskScore}%
+              </Text>
+            </View>
+          </View>
+
+          {scamCategory ? (
+            <View style={styles.categoryCard}>
+              <Ionicons name="alert" size={18} color="#F59E0B" style={{ marginRight: 8 }} />
+              <View>
+                <Text style={styles.categoryLabel}>Detected Scam Category</Text>
+                <Text style={styles.categoryValue}>{scamCategory}</Text>
+              </View>
+            </View>
+          ) : null}
+
           <Text style={styles.sectionTitle}>Risk events</Text>
           <View style={styles.card}>
             {riskEvents.length > 0 ? riskEvents.map((event) => (
               <TouchableOpacity
-                key={event.id}
+                key={event.id || event.label}
                 activeOpacity={0.7}
                 onPress={() =>
-                  Alert.alert(event.label, `Detected at ${event.time}\n\nSeverity: ${event.type === 'danger' ? 'High — confirmed synthetic' : 'Medium — anomalous'}`)
+                  Alert.alert(event.label, `Severity: ${event.type === 'danger' ? 'High — confirmed synthetic/suspicious' : 'Medium — anomalous'}`)
                 }
                 style={styles.eventRow}
               >
@@ -103,7 +247,7 @@ export default function CallDetailsScreen({ navigation, route }) {
                     { backgroundColor: event.type === 'danger' ? '#EF4444' : '#F59E0B' },
                   ]}
                 />
-                <Text style={styles.eventTime}>{event.time}</Text>
+                <Text style={styles.eventTime}>{event.time || '--:--'}</Text>
                 <Text style={styles.eventLabel}>{event.label}</Text>
               </TouchableOpacity>
             )) : (
@@ -111,13 +255,27 @@ export default function CallDetailsScreen({ navigation, route }) {
             )}
           </View>
 
-          {/* AI Explanation Card */}
+          {transcript && transcript.length > 0 ? (
+            <>
+              <Text style={styles.sectionTitle}>Transcript</Text>
+              <View style={styles.card}>
+                {transcript.map((line, idx) => (
+                  <View key={idx} style={{ flexDirection: 'row', marginVertical: 4 }}>
+                    <Text style={styles.tsTime}>{line.time || '--:--'}</Text>
+                    <Text style={styles.tsText}>{line.text || line}</Text>
+                  </View>
+                ))}
+              </View>
+            </>
+          ) : null}
+
           <Text style={styles.sectionTitle}>AI explanation</Text>
           <View style={styles.card}>
-            <Text style={styles.explanationText}>{aiExplanation || 'AI explanation will be available once call analysis is complete.'}</Text>
+            <Text style={styles.explanationText}>
+              {aiExplanation || 'AI analysis explanation is not available for this call.'}
+            </Text>
           </View>
 
-          {/* Action Buttons */}
           <View style={styles.actionsRow}>
             <TouchableOpacity
               activeOpacity={0.7}
@@ -131,12 +289,27 @@ export default function CallDetailsScreen({ navigation, route }) {
             <TouchableOpacity
               activeOpacity={0.7}
               onPress={handleReportScam}
-              style={styles.actionBtn}
+              disabled={reportingSpam}
+              style={[styles.actionBtn, reportingSpam && { opacity: 0.6 }]}
             >
-              <Ionicons name="flag-outline" size={18} color="#F59E0B" style={{ marginRight: 6 }} />
-              <Text style={[styles.actionBtnText, { color: '#F59E0B' }]}>Report scam</Text>
+              {reportingSpam ? (
+                <ActivityIndicator size="small" color="#F59E0B" style={{ marginRight: 6 }} />
+              ) : (
+                <Ionicons name="flag-outline" size={18} color="#F59E0B" style={{ marginRight: 6 }} />
+              )}
+              <Text style={[styles.actionBtnText, { color: '#F59E0B' }]}>Report spam</Text>
             </TouchableOpacity>
           </View>
+
+          <TouchableOpacity
+            activeOpacity={0.7}
+            onPress={handleFileComplaint}
+            style={styles.complaintBtn}
+          >
+            <Ionicons name="document-text-outline" size={18} color="#3B82F6" style={{ marginRight: 8 }} />
+            <Text style={styles.complaintBtnText}>File scam complaint</Text>
+            <Ionicons name="chevron-forward" size={18} color={colors.textMuted} style={{ marginLeft: 'auto' }} />
+          </TouchableOpacity>
         </ScrollView>
 
         <FloatingCallButton onPress={() => navigation.navigate(ROUTES.CONTACTS)} />
@@ -181,36 +354,131 @@ const styles = StyleSheet.create({
     marginTop: 1,
   },
   scrollContent: {},
+  callerHeader: {
+    alignItems: 'center',
+    paddingVertical: 16,
+    marginBottom: 8,
+  },
+  callerAvatar: {
+    width: 84,
+    height: 84,
+    borderRadius: 42,
+    backgroundColor: '#18181B',
+    borderWidth: 3,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 14,
+  },
+  callerAvatarText: {
+    color: '#FFFFFF',
+    fontSize: 30,
+    fontWeight: '700',
+  },
+  callerName: {
+    color: '#FFFFFF',
+    fontSize: 22,
+    fontWeight: '700',
+  },
+  callerNumber: {
+    color: colors.textSecondary,
+    fontSize: 14,
+    marginTop: 2,
+  },
+  riskBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 14,
+    paddingVertical: 6,
+    borderRadius: 14,
+    borderWidth: 1,
+    marginTop: 12,
+  },
+  riskBadgeText: {
+    fontSize: 12,
+    fontWeight: '700',
+  },
+  spamRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: 10,
+  },
+  spamText: {
+    fontSize: 12,
+    fontWeight: '500',
+  },
   gaugeSection: {
     alignItems: 'center',
-    marginVertical: 16,
+    marginVertical: 12,
   },
   gaugeCircle: {
     width: 170,
     height: 170,
     borderRadius: 85,
     borderWidth: 6,
-    borderColor: '#EF4444',
-    borderTopColor: 'rgba(255,255,255,0.1)',
     alignItems: 'center',
     justifyContent: 'center',
   },
   gaugeLabel: {
-    color: colors.textMuted,
     fontSize: 11,
     fontWeight: '700',
     letterSpacing: 1.5,
   },
   gaugeValue: {
-    color: '#EF4444',
     fontSize: 44,
     fontWeight: '800',
     marginVertical: 2,
   },
   gaugeSub: {
-    color: '#EF4444',
     fontSize: 13,
     fontWeight: '600',
+  },
+  metricsRow: {
+    flexDirection: 'row',
+    gap: 12,
+    marginVertical: 8,
+  },
+  metricCard: {
+    flex: 1,
+    backgroundColor: '#131316',
+    borderRadius: 20,
+    padding: 16,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.08)',
+    alignItems: 'center',
+  },
+  metricLabel: {
+    color: colors.textMuted,
+    fontSize: 11,
+    fontWeight: '700',
+    letterSpacing: 1,
+  },
+  metricValue: {
+    color: '#FFFFFF',
+    fontSize: 28,
+    fontWeight: '800',
+    marginTop: 6,
+  },
+  categoryCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'rgba(245, 158, 11, 0.1)',
+    borderRadius: 18,
+    paddingHorizontal: 16,
+    paddingVertical: 14,
+    borderWidth: 1,
+    borderColor: 'rgba(245, 158, 11, 0.25)',
+    marginVertical: 10,
+  },
+  categoryLabel: {
+    color: colors.textSecondary,
+    fontSize: 11,
+    fontWeight: '600',
+  },
+  categoryValue: {
+    color: '#F59E0B',
+    fontSize: 15,
+    fontWeight: '700',
+    marginTop: 2,
   },
   sectionTitle: {
     color: '#FFFFFF',
@@ -248,6 +516,17 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     flex: 1,
   },
+  tsTime: {
+    color: colors.textMuted,
+    fontSize: 12,
+    width: 50,
+  },
+  tsText: {
+    color: '#FFFFFF',
+    fontSize: 14,
+    flex: 1,
+    lineHeight: 20,
+  },
   explanationText: {
     color: colors.textSecondary,
     fontSize: 14,
@@ -271,6 +550,22 @@ const styles = StyleSheet.create({
   },
   actionBtnText: {
     color: '#EF4444',
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  complaintBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#131316',
+    borderRadius: 18,
+    paddingHorizontal: 16,
+    paddingVertical: 14,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.08)',
+    marginTop: 12,
+  },
+  complaintBtnText: {
+    color: '#3B82F6',
     fontSize: 14,
     fontWeight: '600',
   },

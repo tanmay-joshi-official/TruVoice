@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import {
   View,
   Text,
@@ -16,11 +16,17 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Svg, { Path, Defs, LinearGradient as SvgGradient, Stop } from 'react-native-svg';
 import { ROUTES } from '../../constants/routes';
-import { useAiDetectionStore } from '../../store/aiDetectionStore';
+import { normalizeAnalysis } from '../../utils/analysisMapper';
 import { colors } from '../../theme';
 
-// Transcript lines will come from backend speech-to-text
-// No hardcoded dummy data
+const pickEither = (obj, camelKey, snakeKey, fallback = undefined) => {
+  if (obj == null) return fallback;
+  const camel = obj[camelKey];
+  const snake = obj[snakeKey];
+  if (camel !== undefined && camel !== null) return camel;
+  if (snake !== undefined && snake !== null) return snake;
+  return fallback;
+};
 
 export default function CallSummaryScreen({ navigation, route }) {
   const insets = useSafeAreaInsets();
@@ -30,41 +36,163 @@ export default function CallSummaryScreen({ navigation, route }) {
     initials: 'UC',
   };
   const isSavedContact = route.params?.isSavedContact || false;
-
-  const { authenticityScore, aiProbability } = useAiDetectionStore();
-  const transcriptLines = route.params?.transcript || [];
   const callDuration = route.params?.duration || '--';
+  const rawTranscript = route.params?.transcript || [];
+  const lastAnalysisRaw = route.params?.lastAnalysis || null;
+
+  const analysis = useMemo(
+    () => (lastAnalysisRaw ? normalizeAnalysis(lastAnalysisRaw) : null),
+    [lastAnalysisRaw],
+  );
+
+  const aiProbability = pickEither(analysis, 'aiProbability', 'ai_voice_probability', 0);
+  const authenticityScore = pickEither(
+    analysis,
+    'authenticityScore',
+    null,
+    aiProbability != null ? Math.max(0, 100 - aiProbability) : 100,
+  );
+  const unifiedRiskScore = pickEither(analysis, 'unifiedRiskScore', 'unified_risk_score', 0);
+  const scamIntentScore = pickEither(analysis, 'scamIntentScore', 'scam_intent_score', 0);
+  const riskLevelLabel = pickEither(
+    analysis,
+    'riskLevelLabel',
+    'risk_level',
+    unifiedRiskScore > 60 ? 'CRITICAL RISK' : unifiedRiskScore > 30 ? 'MODERATE RISK' : 'LOW RISK',
+  );
+  const scamCategory = pickEither(analysis, 'scamCategory', 'scam_category', '');
+  const reasoning = pickEither(analysis, 'reasoning', 'reasoning', '');
+  const flaggedKeywords = pickEither(
+    analysis,
+    'flaggedKeywords',
+    'flagged_keywords',
+    [],
+  ) || [];
+
+  const transcriptLines = useMemo(() => {
+    if (Array.isArray(rawTranscript) && rawTranscript.length > 0) {
+      return rawTranscript;
+    }
+    if (analysis?.transcriptLines?.length) {
+      return analysis.transcriptLines;
+    }
+    return [];
+  }, [rawTranscript, analysis]);
+
+  const hasAnalysis =
+    !isSavedContact &&
+    (lastAnalysisRaw ||
+      (typeof unifiedRiskScore === 'number' && unifiedRiskScore > 0) ||
+      (typeof aiProbability === 'number' && aiProbability > 0));
+
+  const riskColor = () => {
+    if (!hasAnalysis) return '#22C55E';
+    if (unifiedRiskScore > 60) return '#EF4444';
+    if (unifiedRiskScore > 30) return '#F59E0B';
+    return '#22C55E';
+  };
+
+  const badgeLabel = () => {
+    if (isSavedContact) return { label: 'Saved contact', color: '#22C55E' };
+    if (!hasAnalysis) return { label: 'No analysis', color: colors.textMuted };
+    if (aiProbability > 60) return { label: 'Synthetic voice', color: '#EF4444' };
+    if (aiProbability > 30 || unifiedRiskScore > 50) return { label: 'Suspicious', color: '#F59E0B' };
+    return { label: 'Verified human', color: '#22C55E' };
+  };
+
+  const badge = badgeLabel();
 
   const handleCopyTranscript = async () => {
     if (transcriptLines.length === 0) {
-      Alert.alert('No Transcript', 'Transcript data is not yet available.');
+      Alert.alert('No Transcript', 'Transcript data is not yet available for this call.');
       return;
     }
     const transcriptText = transcriptLines
-      .map((line) => `[${line.time}] ${line.text}`)
+      .map((line) => `[${line.time || '--:--'}] ${line.text || line}`)
       .join('\n');
     try {
       await Clipboard.setStringAsync(transcriptText);
       Alert.alert('Copied', 'Full transcript copied to clipboard.');
     } catch {
-      Alert.alert('Copy', 'Transcript:\n\n' + transcriptText);
+      Alert.alert('Transcript', transcriptText);
     }
   };
+
+  const handleViewDetails = () => {
+    const callPayload = {
+      id: pickEither(analysis, 'id', null) || `temp-${Date.now()}`,
+      callerNumber: contact.number || contact.phone_number || '',
+      caller_number: contact.number || contact.phone_number || '',
+      number: contact.number || contact.phone_number || '',
+      name: contact.name || 'Unknown Caller',
+      initials: contact.initials || 'UC',
+      time: '--:--',
+      duration: callDuration,
+      authenticityScore,
+      aiProbability,
+      ai_voice_probability: aiProbability,
+      unifiedRiskScore,
+      unified_risk_score: unifiedRiskScore,
+      scamIntentScore,
+      scam_intent_score: scamIntentScore,
+      riskLevelLabel,
+      risk_level: riskLevelLabel,
+      scamCategory,
+      scam_category: scamCategory,
+      flaggedKeywords,
+      flagged_keywords: flaggedKeywords,
+      reasoning,
+      aiExplanation: reasoning,
+      transcript: transcriptLines,
+      transcriptLines,
+      riskEvents: flaggedKeywords.map((k, i) => ({
+        id: `kw-${i}`,
+        time: '--:--',
+        label: k,
+        type: unifiedRiskScore >= 70 ? 'danger' : 'warning',
+      })),
+    };
+    navigation.navigate(ROUTES.CALL_DETAILS, { call: callPayload });
+  };
+
+  const renderChartPath = () => {
+    const score = hasAnalysis ? unifiedRiskScore : 20;
+    const peaks = Math.max(3, Math.round(score / 20));
+    const startY = 90;
+    const minY = Math.max(10, startY - score * 0.7);
+    let d = `M 10,${startY}`;
+    const step = 280 / Math.max(peaks, 4);
+    for (let i = 1; i <= peaks; i++) {
+      const x = 10 + i * step;
+      const y = i % 2 === 1 ? minY + (i * 3) % 20 : startY - ((i * 7) % 15);
+      const prevX = 10 + (i - 1) * step;
+      const qx = (prevX + x) / 2;
+      const qy = i % 2 === 1 ? minY - 5 : startY + 5;
+      d += ` Q ${qx},${qy} ${x},${Math.min(Math.max(y, 10), startY)}`;
+    }
+    const finalX = 290;
+    d += ` T ${finalX},${Math.min(Math.max(startY - (score * 0.3), 20), startY)}`;
+    const fillPath = `${d} L ${finalX},100 L 10,100 Z`;
+    return { line: d, fill: fillPath };
+  };
+
+  const chartPath = renderChartPath();
+  const chartColor = riskColor();
 
   return (
     <SafeAreaView style={styles.safeArea}>
       <StatusBar barStyle="light-content" backgroundColor="#09090B" />
       <View style={styles.container}>
-        {/* Header */}
         <View style={styles.header}>
           <TouchableOpacity
-            onPress={() => navigation.navigate(ROUTES.MAIN_TABS)}
+            onPress={() => navigation.reset({ index: 0, routes: [{ name: ROUTES.MAIN_TABS }] })}
             style={styles.backBtn}
             activeOpacity={0.7}
           >
             <Ionicons name="chevron-back" size={24} color="#FFFFFF" />
           </TouchableOpacity>
           <Text style={styles.headerTitle}>Call summary</Text>
+          <View style={{ width: 36 }} />
         </View>
 
         <ScrollView
@@ -74,7 +202,6 @@ export default function CallSummaryScreen({ navigation, route }) {
             { paddingBottom: Math.max(insets.bottom + 40, 50) },
           ]}
         >
-          {/* Main Summary Header Card */}
           <View style={styles.summaryCard}>
             <LinearGradient
               colors={contact.colors || ['#EF4444', '#3B82F6']}
@@ -86,61 +213,133 @@ export default function CallSummaryScreen({ navigation, route }) {
             <Text style={styles.callerName}>{contact.name || 'Unknown Caller'}</Text>
             <Text style={styles.callMeta}>{callDuration}</Text>
 
-            {!isSavedContact && (
-              <View style={[styles.syntheticBadge, aiProbability < 40 && { backgroundColor: 'rgba(34, 197, 94, 0.15)' }]}>
-                <Text style={[styles.syntheticText, aiProbability < 40 && { color: '#22C55E' }]}>
-                  {aiProbability > 60 ? 'Synthetic voice' : aiProbability > 30 ? 'Suspicious' : 'Verified human'}
+            <View
+              style={[
+                styles.syntheticBadge,
+                { backgroundColor: `${badge.color}26`, borderColor: `${badge.color}55` },
+              ]}
+            >
+              <Text style={[styles.syntheticText, { color: badge.color }]}>
+                {badge.label}
+              </Text>
+            </View>
+
+            {scamCategory ? (
+              <View style={[styles.categoryBadge]}>
+                <Ionicons name="alert" size={12} color="#F59E0B" style={{ marginRight: 6 }} />
+                <Text style={styles.categoryBadgeText}>{scamCategory}</Text>
+              </View>
+            ) : null}
+          </View>
+
+          {hasAnalysis ? (
+            <View style={styles.metricsRow}>
+              <View style={styles.metricCard}>
+                <Text style={styles.metricLabel}>AUTHENTICITY</Text>
+                <Text style={[styles.metricValue, { color: authenticityScore > 60 ? '#22C55E' : unifiedRiskScore > 60 ? '#EF4444' : '#F59E0B' }]}>
+                  {`${authenticityScore}%`}
                 </Text>
               </View>
-            )}
-            {isSavedContact && (
-              <View style={[styles.syntheticBadge, { backgroundColor: 'rgba(34, 197, 94, 0.15)' }]}>
-                <Text style={[styles.syntheticText, { color: '#22C55E' }]}>Saved contact</Text>
+
+              <View style={styles.metricCard}>
+                <Text style={styles.metricLabel}>AI PROB.</Text>
+                <Text style={[styles.metricValue, { color: aiProbability > 50 ? '#EF4444' : '#22C55E' }]}>
+                  {`${aiProbability}%`}
+                </Text>
               </View>
-            )}
-          </View>
 
-          {/* Metric Cards Row */}
-          <View style={styles.metricsRow}>
-            <View style={styles.metricCard}>
-              <Text style={styles.metricLabel}>AVG AUTHENTICITY</Text>
-              <Text style={[styles.metricValueDanger, authenticityScore > 60 && { color: '#22C55E' }]}>
-                {isSavedContact ? 'N/A' : `${authenticityScore}%`}
-              </Text>
+              <View style={styles.metricCard}>
+                <Text style={styles.metricLabel}>RISK</Text>
+                <Text style={[styles.metricValue, { color: riskColor() }]}>
+                  {`${unifiedRiskScore}%`}
+                </Text>
+              </View>
             </View>
+          ) : (
+            <View style={[styles.metricsRow, { opacity: 0.6 }]}>
+              <View style={styles.metricCard}>
+                <Text style={styles.metricLabel}>AUTHENTICITY</Text>
+                <Text style={[styles.metricValue, { color: colors.textMuted }]}>
+                  {isSavedContact ? 'N/A' : '--'}
+                </Text>
+              </View>
 
-            <View style={styles.metricCard}>
-              <Text style={styles.metricLabel}>MAX AI PROB.</Text>
-              <Text style={[styles.metricValueDanger, aiProbability < 40 && { color: '#22C55E' }]}>
-                {isSavedContact ? 'N/A' : `${aiProbability}%`}
-              </Text>
+              <View style={styles.metricCard}>
+                <Text style={styles.metricLabel}>AI PROB.</Text>
+                <Text style={[styles.metricValue, { color: colors.textMuted }]}>
+                  {isSavedContact ? 'N/A' : '--'}
+                </Text>
+              </View>
+
+              <View style={styles.metricCard}>
+                <Text style={styles.metricLabel}>RISK</Text>
+                <Text style={[styles.metricValue, { color: colors.textMuted }]}>
+                  {isSavedContact ? 'N/A' : '--'}
+                </Text>
+              </View>
             </View>
-          </View>
+          )}
 
-          {/* Risk Timeline Chart */}
-          <Text style={styles.sectionTitle}>Risk timeline</Text>
-          <View style={styles.chartCard}>
-            <Svg height="100" width="100%" viewBox="0 0 300 100">
-              <Defs>
-                <SvgGradient id="grad" x1="0" y1="0" x2="0" y2="1">
-                  <Stop offset="0" stopColor="#EF4444" stopOpacity="0.5" />
-                  <Stop offset="1" stopColor="#EF4444" stopOpacity="0.0" />
-                </SvgGradient>
-              </Defs>
-              <Path
-                d="M 10,70 Q 80,60 150,30 T 290,20 L 290,100 L 10,100 Z"
-                fill="url(#grad)"
-              />
-              <Path
-                d="M 10,70 Q 80,60 150,30 T 290,20"
-                fill="none"
-                stroke="#EF4444"
-                strokeWidth="3"
-              />
-            </Svg>
-          </View>
+          {hasAnalysis ? (
+            <>
+              <View style={styles.riskLevelRow}>
+                <Ionicons
+                  name={
+                    unifiedRiskScore > 60
+                      ? 'warning'
+                      : unifiedRiskScore > 30
+                        ? 'alert-circle'
+                        : 'shield-checkmark'
+                  }
+                  size={16}
+                  color={riskColor()}
+                  style={{ marginRight: 8 }}
+                />
+                <Text style={[styles.riskLevelLabel, { color: riskColor() }]}>
+                  {String(riskLevelLabel).toUpperCase()}
+                </Text>
+                {scamIntentScore > 0 ? (
+                  <Text style={styles.scamIntentPill}>
+                    Scam intent {scamIntentScore}%
+                  </Text>
+                ) : null}
+              </View>
 
-          {/* Transcript Section */}
+              <Text style={styles.sectionTitle}>Risk timeline</Text>
+              <View style={styles.chartCard}>
+                <Svg height="100" width="100%" viewBox="0 0 300 100">
+                  <Defs>
+                    <SvgGradient id="sumGrad" x1="0" y1="0" x2="0" y2="1">
+                      <Stop offset="0" stopColor={chartColor} stopOpacity="0.45" />
+                      <Stop offset="1" stopColor={chartColor} stopOpacity="0.0" />
+                    </SvgGradient>
+                  </Defs>
+                  <Path d={chartPath.fill} fill="url(#sumGrad)" />
+                  <Path
+                    d={chartPath.line}
+                    fill="none"
+                    stroke={chartColor}
+                    strokeWidth="3"
+                  />
+                </Svg>
+              </View>
+            </>
+          ) : null}
+
+          {flaggedKeywords && flaggedKeywords.length > 0 ? (
+            <>
+              <Text style={styles.sectionTitle}>Flagged keywords</Text>
+              <View style={styles.keywordsWrap}>
+                {flaggedKeywords.map((k, i) => (
+                  <View key={`${k}-${i}`} style={styles.keywordChip}>
+                    <Ionicons name="flag" size={12} color="#F59E0B" style={{ marginRight: 6 }} />
+                    <Text style={styles.keywordText}>{k}</Text>
+                  </View>
+                ))}
+              </View>
+            </>
+          ) : null}
+
           <View style={styles.transcriptHeader}>
             <Text style={styles.sectionTitle}>Transcript</Text>
             <TouchableOpacity activeOpacity={0.7} onPress={handleCopyTranscript}>
@@ -149,18 +348,64 @@ export default function CallSummaryScreen({ navigation, route }) {
           </View>
 
           <View style={styles.transcriptCard}>
-            {transcriptLines.length > 0 ? transcriptLines.map((line, idx) => (
-              <View key={idx} style={styles.tsRow}>
-                <Text style={styles.tsTime}>{line.time}</Text>
-                <Text style={styles.tsText}>{line.text}</Text>
-              </View>
-            )) : (
-              <Text style={{ color: colors.textMuted, fontSize: 13, textAlign: 'center' }}>
-                Transcript will be available once backend speech-to-text is connected.
+            {transcriptLines.length > 0 ? (
+              transcriptLines.map((line, idx) => (
+                <View key={idx} style={styles.tsRow}>
+                  <Text style={styles.tsTime}>{line.time || '--:--'}</Text>
+                  <Text style={styles.tsText}>{line.text || String(line)}</Text>
+                </View>
+              ))
+            ) : (
+              <Text
+                style={{
+                  color: colors.textMuted,
+                  fontSize: 13,
+                  textAlign: 'center',
+                  lineHeight: 20,
+                }}
+              >
+                {isSavedContact
+                  ? 'Transcript is not recorded for saved contacts by default.'
+                  : 'Transcript will appear once speech-to-text is available for this call.'}
               </Text>
             )}
           </View>
+
+          {reasoning ? (
+            <>
+              <Text style={styles.sectionTitle}>Why this rating</Text>
+              <View style={styles.reasoningCard}>
+                <Ionicons
+                  name="information-circle-outline"
+                  size={18}
+                  color={riskColor()}
+                  style={{ marginRight: 10, marginTop: 1 }}
+                />
+                <Text style={styles.reasoningText}>{reasoning}</Text>
+              </View>
+            </>
+          ) : null}
         </ScrollView>
+
+        <View style={[styles.footerRow, { paddingBottom: Math.max(insets.bottom + 16, 20) }]}>
+          <TouchableOpacity
+            activeOpacity={0.7}
+            onPress={() => navigation.reset({ index: 0, routes: [{ name: ROUTES.MAIN_TABS }] })}
+            style={styles.secondaryBtn}
+          >
+            <Ionicons name="home-outline" size={18} color="#FFFFFF" style={{ marginRight: 8 }} />
+            <Text style={styles.secondaryBtnText}>Home</Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            activeOpacity={0.7}
+            onPress={handleViewDetails}
+            style={[styles.primaryBtn, { backgroundColor: hasAnalysis ? riskColor() : '#3B82F6' }]}
+          >
+            <Text style={styles.primaryBtnText}>View full details</Text>
+            <Ionicons name="arrow-forward" size={16} color="#FFFFFF" style={{ marginLeft: 8 }} />
+          </TouchableOpacity>
+        </View>
       </View>
     </SafeAreaView>
   );
@@ -180,6 +425,7 @@ const styles = StyleSheet.create({
   header: {
     flexDirection: 'row',
     alignItems: 'center',
+    justifyContent: 'space-between',
     paddingVertical: 14,
   },
   backBtn: {
@@ -189,11 +435,10 @@ const styles = StyleSheet.create({
     backgroundColor: '#18181B',
     alignItems: 'center',
     justifyContent: 'center',
-    marginRight: 14,
   },
   headerTitle: {
     color: '#FFFFFF',
-    fontSize: 22,
+    fontSize: 20,
     fontWeight: '700',
   },
   scrollContent: {},
@@ -230,45 +475,81 @@ const styles = StyleSheet.create({
     marginTop: 4,
   },
   syntheticBadge: {
-    backgroundColor: 'rgba(239, 68, 68, 0.15)',
     paddingHorizontal: 14,
     paddingVertical: 6,
     borderRadius: 14,
     marginTop: 12,
+    borderWidth: 1,
   },
   syntheticText: {
-    color: '#EF4444',
     fontSize: 12,
     fontWeight: '700',
   },
+  categoryBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'rgba(245, 158, 11, 0.12)',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 12,
+    marginTop: 8,
+    borderWidth: 1,
+    borderColor: 'rgba(245, 158, 11, 0.25)',
+  },
+  categoryBadgeText: {
+    color: '#F59E0B',
+    fontSize: 12,
+    fontWeight: '600',
+  },
   metricsRow: {
     flexDirection: 'row',
-    gap: 12,
+    gap: 10,
     marginVertical: 8,
   },
   metricCard: {
     flex: 1,
     backgroundColor: '#131316',
-    borderRadius: 20,
-    padding: 18,
+    borderRadius: 18,
+    padding: 14,
     borderWidth: 1,
     borderColor: 'rgba(255, 255, 255, 0.08)',
+    alignItems: 'center',
   },
   metricLabel: {
     color: colors.textMuted,
-    fontSize: 11,
+    fontSize: 10,
     fontWeight: '700',
-    letterSpacing: 1,
+    letterSpacing: 0.5,
   },
-  metricValueDanger: {
-    color: '#EF4444',
-    fontSize: 32,
+  metricValue: {
+    fontSize: 26,
     fontWeight: '800',
     marginTop: 6,
   },
+  riskLevelRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: 10,
+    marginBottom: 2,
+  },
+  riskLevelLabel: {
+    fontSize: 13,
+    fontWeight: '800',
+    letterSpacing: 1,
+  },
+  scamIntentPill: {
+    marginLeft: 'auto',
+    color: colors.textSecondary,
+    fontSize: 11,
+    fontWeight: '600',
+    backgroundColor: 'rgba(239, 68, 68, 0.1)',
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 10,
+  },
   sectionTitle: {
     color: '#FFFFFF',
-    fontSize: 16,
+    fontSize: 15,
     fontWeight: '700',
     marginTop: 18,
     marginBottom: 10,
@@ -280,6 +561,26 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: 'rgba(255, 255, 255, 0.08)',
   },
+  keywordsWrap: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+  },
+  keywordChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#131316',
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: 'rgba(245, 158, 11, 0.2)',
+  },
+  keywordText: {
+    color: '#F59E0B',
+    fontSize: 12,
+    fontWeight: '600',
+  },
   transcriptHeader: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -287,7 +588,7 @@ const styles = StyleSheet.create({
   },
   copyText: {
     color: '#3B82F6',
-    fontSize: 14,
+    fontSize: 13,
     fontWeight: '500',
   },
   transcriptCard: {
@@ -304,12 +605,62 @@ const styles = StyleSheet.create({
   tsTime: {
     color: colors.textMuted,
     fontSize: 12,
-    width: 44,
+    width: 48,
   },
   tsText: {
     color: '#FFFFFF',
     fontSize: 14,
     flex: 1,
     lineHeight: 20,
+  },
+  reasoningCard: {
+    flexDirection: 'row',
+    backgroundColor: '#131316',
+    borderRadius: 20,
+    padding: 16,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.08)',
+  },
+  reasoningText: {
+    color: colors.textSecondary,
+    fontSize: 13,
+    lineHeight: 20,
+    flex: 1,
+  },
+  footerRow: {
+    flexDirection: 'row',
+    gap: 10,
+    paddingTop: 12,
+    borderTopWidth: 1,
+    borderTopColor: 'rgba(255,255,255,0.06)',
+  },
+  secondaryBtn: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#18181B',
+    borderRadius: 16,
+    paddingVertical: 14,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.08)',
+  },
+  secondaryBtnText: {
+    color: '#FFFFFF',
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  primaryBtn: {
+    flex: 1.5,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderRadius: 16,
+    paddingVertical: 14,
+  },
+  primaryBtnText: {
+    color: '#FFFFFF',
+    fontSize: 14,
+    fontWeight: '700',
   },
 });

@@ -13,38 +13,38 @@ import ScreenContainer from '../../components/layout/ScreenContainer';
 import TruVoiceLogo from '../../components/common/TruVoiceLogo';
 import AppInput from '../../components/inputs/AppInput';
 import PrimaryButton from '../../components/buttons/PrimaryButton';
-import SecondaryButton from '../../components/buttons/SecondaryButton';
-import OrDivider from '../../components/common/OrDivider';
 import SecurityNote from '../../components/cards/SecurityNote';
 import { ROUTES } from '../../constants/routes';
 import { useAuthStore } from '../../store/authStore';
 
 export default function LoginScreen() {
   const navigation = useNavigation();
-  const { login, loginAsGuest, isLoading } = useAuthStore();
+  const { initiateLogin, isLoading } = useAuthStore();
 
-  const [email, setEmail] = useState('');
+  const [phoneNumber, setPhoneNumber] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState('');
 
   const handleLogin = async () => {
-    if (!email.trim() || !password.trim()) {
-      setError('Please enter email and password.');
+    if (!phoneNumber.trim() || !password.trim()) {
+      setError('Please enter phone number and password.');
       return;
     }
+
     setError('');
     try {
-      await login({ email: email.trim(), password });
-      navigation.replace(ROUTES.MAIN_TABS);
+      await initiateLogin({
+        phone_number: phoneNumber.trim(),
+        password,
+      });
+      navigation.navigate(ROUTES.OTP, {
+        phone_number: phoneNumber.trim(),
+        purpose: 'login',
+      });
     } catch (err) {
       setError(err.message || 'Login failed.');
     }
-  };
-
-  const handleGuest = async () => {
-    await loginAsGuest();
-    navigation.replace(ROUTES.MAIN_TABS);
   };
 
   return (
@@ -70,12 +70,12 @@ export default function LoginScreen() {
 
           <View className="mt-8">
             <AppInput
-              label="Email"
-              value={email}
-              onChangeText={setEmail}
-              placeholder="you@truvoice.app"
-              keyboardType="email-address"
-              leftIcon="email-outline"
+              label="Phone number"
+              value={phoneNumber}
+              onChangeText={setPhoneNumber}
+              placeholder="+919876543210"
+              keyboardType="phone-pad"
+              leftIcon="phone-outline"
             />
             <AppInput
               label="Password"
@@ -89,15 +89,6 @@ export default function LoginScreen() {
             />
           </View>
 
-          <Pressable
-            onPress={() => navigation.navigate(ROUTES.FORGOT_PASSWORD)}
-            className="-mt-1 self-end active:opacity-70"
-          >
-            <Text className="text-sm font-medium text-primary">
-              Forgot password?
-            </Text>
-          </Pressable>
-
           {error ? (
             <Text className="mt-3 text-sm text-danger">{error}</Text>
           ) : null}
@@ -108,29 +99,6 @@ export default function LoginScreen() {
             loading={isLoading}
             className="mt-6"
           />
-
-          <OrDivider />
-
-          <SecondaryButton
-            label="Continue with Google"
-            icon="google"
-            onPress={handleLogin}
-          />
-
-          <Pressable
-            onPress={handleGuest}
-            className="mt-4 flex-row items-center justify-center py-3 active:opacity-70"
-          >
-            <MaterialCommunityIcons
-              name="fingerprint"
-              size={20}
-              color="#FFFFFF"
-              style={{ marginRight: 8 }}
-            />
-            <Text className="text-base font-medium text-white">
-              Continue as guest
-            </Text>
-          </Pressable>
 
           <SecurityNote className="mt-8" />
 

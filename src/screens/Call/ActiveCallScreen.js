@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import {
   View,
   Text,
@@ -25,8 +25,9 @@ import Animated, {
 import { ROUTES } from '../../constants/routes';
 import { colors } from '../../theme';
 import { audioChunker } from '../../services/audio/audioChunker';
-import { socketService } from '../../services/socket/socketService';
+import { analysisService } from '../../services/analysis/analysisService';
 import { useAiDetectionStore } from '../../store/aiDetectionStore';
+import { useHistoryStore } from '../../store/historyStore';
 import { useContactsStore } from '../../store/contactsStore';
 
 function PulseRing() {
@@ -76,20 +77,32 @@ export default function ActiveCallScreen({ navigation, route }) {
   const [analysisStopped, setAnalysisStopped] = useState(false);
   const [showKeypad, setShowKeypad] = useState(false);
   const [dtmfText, setDtmfText] = useState('');
+  const [isAnalyzing, setIsAnalyzing] = useState(false);
+  const [analysisError, setAnalysisError] = useState('');
+
+  const transcriptLinesRef = useRef([]);
+  const lastAnalysisRef = useRef(null);
 
   const storeContacts = useContactsStore((s) => s.contacts);
-  const { authenticityScore, aiProbability, confidence, riskLevel, updateAnalysis, reset: resetAi } =
-    useAiDetectionStore();
+  const aiStore = useAiDetectionStore();
+  const prependHistoryItem = useHistoryStore((s) => s.prependItem);
 
-  // Determine if this contact is saved in phone
+  const { authenticityScore, aiProbability, confidence, riskLevelLabel, scamCategory, scamIntentScore, unifiedRiskScore } = aiStore;
+
   const isSavedContact = storeContacts.some(
     (c) =>
       c.name === contact.name ||
       (contact.number && c.number && c.number.replace(/\D/g, '') === contact.number.replace(/\D/g, '')),
   );
 
-  // Should analysis run? Only for unknown/unsaved contacts
+  const callerNumber = contact.number || contact.phone_number || '';
   const shouldAnalyze = !isSavedContact && !analysisStopped;
+
+  useEffect(() => {
+    aiStore.reset();
+    transcriptLinesRef.current = [];
+    lastAnalysisRef.current = null;
+  }, [aiStore]);
 
   useEffect(() => {
     const timer = setInterval(() => {
@@ -98,49 +111,50 @@ export default function ActiveCallScreen({ navigation, route }) {
     return () => clearInterval(timer);
   }, []);
 
-  // Audio chunking & socket — only for unknown contacts
+  const analyzeChunk = useCallback(
+    async (mp3Uri) => {
+      if (!mp3Uri || !callerNumber) return;
+      setIsAnalyzing(true);
+      setAnalysisError('');
+      try {
+        const result = await analysisService.analyzeChunk(mp3Uri, callerNumber);
+        aiStore.updateFromBackend(result);
+        lastAnalysisRef.current = result;
+
+        if (result.transcriptLines && result.transcriptLines.length > 0) {
+          transcriptLinesRef.current = [
+            ...transcriptLinesRef.current,
+            ...result.transcriptLines,
+          ].slice(-60);
+        }
+
+        prependHistoryItem(result);
+      } catch (err) {
+        setAnalysisError(err.message || 'Analysis failed');
+      } finally {
+        setIsAnalyzing(false);
+      }
+    },
+    [callerNumber, aiStore, prependHistoryItem],
+  );
+
   useEffect(() => {
     if (!shouldAnalyze) return;
 
-    let socket;
-    try {
-      socket = socketService.getVoiceAnalysisSocket();
-      socket.on('ai_analysis_update', (data) => {
-        if (data) updateAnalysis(data);
-      });
-    } catch (e) {
-      console.log('Socket fallback:', e.message);
-    }
-
-    audioChunker.startChunking((chunkData) => {
+    audioChunker.startChunking(async (chunkData) => {
       setChunkCount((prev) => prev + 1);
 
-      if (socket && socket.connected) {
-        socket.emit('audio_chunk', {
-          callId: 'call_' + Date.now(),
-          chunkIndex: chunkData.chunkIndex,
-          audioBase64: chunkData.base64Data,
-          mimeType: chunkData.mimeType,
-          timestamp: chunkData.timestamp,
-        });
-      } else if (!chunkData.isMuted && !chunkData.isAnalysisStopped) {
-        // Offline simulation
-        const simScore = Math.max(15, 80 - (chunkData.chunkIndex % 6) * 8);
-        const simAi = Math.min(92, 20 + (chunkData.chunkIndex % 6) * 10);
-        updateAnalysis({
-          authenticityScore: simScore,
-          aiProbability: simAi,
-          confidence: 72 + (chunkData.chunkIndex % 4) * 5,
-          riskLevel: simAi > 50 ? 'high' : 'low',
-        });
+      if (chunkData.isMuted || chunkData.isAnalysisStopped || !chunkData.mp3Uri) {
+        return;
       }
+
+      await analyzeChunk(chunkData.mp3Uri);
     }, 20000);
 
     return () => {
       audioChunker.stopChunking();
-      if (socket) socket.off('ai_analysis_update');
     };
-  }, [shouldAnalyze, updateAnalysis]);
+  }, [shouldAnalyze, analyzeChunk]);
 
   const handleToggleMute = useCallback(() => {
     const next = !isMuted;
@@ -186,14 +200,18 @@ export default function ActiveCallScreen({ navigation, route }) {
   const handleResumeAnalysis = useCallback(() => {
     setAnalysisStopped(false);
     audioChunker.setAnalysisStopped(false);
-    audioChunker.startChunking((chunkData) => {
-      setChunkCount((prev) => prev + 1);
-    }, 20000);
   }, []);
 
   const handleEndCall = () => {
     audioChunker.stopChunking();
-    navigation.replace(ROUTES.CALL_SUMMARY, { contact, isSavedContact });
+    const duration = `${Math.floor(seconds / 60)}m ${seconds % 60}s`;
+    navigation.replace(ROUTES.CALL_SUMMARY, {
+      contact,
+      isSavedContact,
+      duration,
+      transcript: transcriptLinesRef.current,
+      lastAnalysis: lastAnalysisRef.current,
+    });
   };
 
   const formatTimer = (sec) => {
@@ -202,7 +220,6 @@ export default function ActiveCallScreen({ navigation, route }) {
     return `${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
   };
 
-  // Bubble color based on risk
   const getBubbleColor = () => {
     if (analysisStopped) return '#71717A';
     if (aiProbability > 60) return '#EF4444';
@@ -221,7 +238,6 @@ export default function ActiveCallScreen({ navigation, route }) {
     <SafeAreaView style={styles.safeArea}>
       <StatusBar barStyle="light-content" backgroundColor="#09090B" />
       <View style={[styles.container, { paddingBottom: Math.max(insets.bottom + 20, 30) }]}>
-        {/* Header — Timer */}
         <View style={styles.header}>
           <View style={styles.encryptedPill}>
             <Ionicons name="lock-closed" size={12} color="#22C55E" style={{ marginRight: 4 }} />
@@ -230,7 +246,6 @@ export default function ActiveCallScreen({ navigation, route }) {
           <Text style={styles.timerSmall}>{formatTimer(seconds)}</Text>
         </View>
 
-        {/* Center — Caller Avatar & Info */}
         <View style={styles.callerCenter}>
           <View style={styles.avatarArea}>
             <PulseRing />
@@ -255,7 +270,6 @@ export default function ActiveCallScreen({ navigation, route }) {
           )}
         </View>
 
-        {/* Floating AI Analysis Bubble — only for unknown contacts */}
         {!isSavedContact && (
           <View style={styles.bubbleContainer}>
             <TouchableOpacity
@@ -267,9 +281,11 @@ export default function ActiveCallScreen({ navigation, route }) {
               {!analysisStopped && (
                 <Text style={styles.bubbleScore}>{authenticityScore}%</Text>
               )}
+              {isAnalyzing && !analysisStopped && (
+                <View style={styles.bubbleSpinner} />
+              )}
             </TouchableOpacity>
 
-            {/* Expandable Mini Analysis Card */}
             {showAnalysisCard && (
               <Animated.View
                 entering={FadeIn.duration(200)}
@@ -302,9 +318,32 @@ export default function ActiveCallScreen({ navigation, route }) {
                       </Text>
                     </View>
                     <View style={styles.analysisRow}>
-                      <Text style={styles.analysisLabel}>Confidence</Text>
-                      <Text style={styles.analysisValue}>{confidence}%</Text>
+                      <Text style={styles.analysisLabel}>Risk Score</Text>
+                      <Text style={[styles.analysisValue, { color: unifiedRiskScore > 50 ? '#EF4444' : '#22C55E' }]}>
+                        {unifiedRiskScore}%
+                      </Text>
                     </View>
+                    {riskLevelLabel ? (
+                      <View style={styles.analysisRow}>
+                        <Text style={styles.analysisLabel}>Risk</Text>
+                        <Text style={[styles.analysisValue, {
+                          color: unifiedRiskScore > 60 ? '#EF4444' : unifiedRiskScore > 30 ? '#F59E0B' : '#22C55E',
+                          fontSize: 12,
+                        }]}>
+                          {riskLevelLabel}
+                        </Text>
+                      </View>
+                    ) : null}
+                    {scamCategory ? (
+                      <Text style={styles.scamCategoryText}>
+                        {scamCategory}
+                      </Text>
+                    ) : null}
+                    {analysisError ? (
+                      <Text style={styles.analysisErrorText}>
+                        {analysisError}
+                      </Text>
+                    ) : null}
                     <View style={styles.cardDivider} />
                     <TouchableOpacity
                       onPress={handleStopAnalysis}
@@ -320,7 +359,6 @@ export default function ActiveCallScreen({ navigation, route }) {
           </View>
         )}
 
-        {/* Call Controls */}
         <View style={styles.controlsRow}>
           <TouchableOpacity
             activeOpacity={0.7}
@@ -367,7 +405,6 @@ export default function ActiveCallScreen({ navigation, route }) {
           </TouchableOpacity>
         </View>
 
-        {/* DTMF Keypad Overlay */}
         {showKeypad && (
           <View style={styles.keypadOverlay}>
             <View style={styles.keypadOverlayHeader}>
@@ -390,7 +427,6 @@ export default function ActiveCallScreen({ navigation, route }) {
           </View>
         )}
 
-        {/* End Call */}
         <View style={styles.endCallArea}>
           <TouchableOpacity activeOpacity={0.8} onPress={handleEndCall} style={styles.endCallBtn}>
             <Ionicons name="call-sharp" size={30} color="#FFFFFF" style={{ transform: [{ rotate: '135deg' }] }} />
@@ -518,13 +554,24 @@ const styles = StyleSheet.create({
     fontWeight: '800',
     marginTop: 1,
   },
+  bubbleSpinner: {
+    position: 'absolute',
+    top: 2,
+    right: 2,
+    width: 12,
+    height: 12,
+    borderRadius: 6,
+    borderWidth: 2,
+    borderColor: '#FFFFFF',
+    borderTopColor: 'transparent',
+  },
   analysisCard: {
     marginTop: 8,
     backgroundColor: '#1A1A1E',
     borderRadius: 18,
     borderWidth: 1,
     borderColor: 'rgba(255, 255, 255, 0.1)',
-    width: 200,
+    width: 220,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 6 },
     shadowOpacity: 0.4,
@@ -555,6 +602,20 @@ const styles = StyleSheet.create({
     fontSize: 11,
     marginTop: 2,
     marginBottom: 10,
+  },
+  scamCategoryText: {
+    color: '#F59E0B',
+    fontSize: 11,
+    fontWeight: '600',
+    textAlign: 'center',
+    marginTop: 4,
+    marginBottom: 4,
+  },
+  analysisErrorText: {
+    color: '#EF4444',
+    fontSize: 11,
+    textAlign: 'center',
+    marginTop: 4,
   },
   cardDivider: {
     height: 1,
@@ -667,7 +728,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.06)',
+    borderColor: 'rgba(255, 255, 255, 0.06)',
   },
   keypadOverlayKeyText: {
     color: '#FFFFFF',

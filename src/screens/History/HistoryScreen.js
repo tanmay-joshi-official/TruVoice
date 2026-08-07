@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
   View,
   Text,
@@ -9,40 +9,75 @@ import {
   SafeAreaView,
   StatusBar,
   Platform,
+  RefreshControl,
+  ActivityIndicator,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import FloatingCallButton from '../../components/buttons/FloatingCallButton';
 import { ROUTES } from '../../constants/routes';
 import { colors } from '../../theme';
+import { useHistoryStore } from '../../store/historyStore';
 
-const FILTERS = ['All', 'Human', 'AI', 'Suspicious', 'Missed'];
+const FILTERS = ['All', 'Human', 'AI', 'Suspicious'];
 
 export default function HistoryScreen({ navigation }) {
   const insets = useSafeAreaInsets();
   const [activeFilter, setActiveFilter] = useState('All');
   const [search, setSearch] = useState('');
+  const [refreshing, setRefreshing] = useState(false);
 
-  // Call history will be populated from backend API
-  // No dummy data — show empty state until backend integration
-  const historyItems = [];
+  const { items, isLoading, error, fetchHistory } = useHistoryStore();
 
-  const filteredItems = historyItems.filter((item) => {
-    const matchesSearch =
-      item.name.toLowerCase().includes(search.toLowerCase()) ||
-      item.number.toLowerCase().includes(search.toLowerCase());
+  const loadHistory = useCallback(async () => {
+    try {
+      await fetchHistory();
+    } catch {
+      // error stored in the store
+    }
+  }, [fetchHistory]);
+
+  useEffect(() => {
+    if (items.length === 0) {
+      loadHistory();
+    }
+  }, [items.length, loadHistory]);
+
+  const handleRefresh = async () => {
+    setRefreshing(true);
+    try {
+      await loadHistory();
+    } finally {
+      setRefreshing(false);
+    }
+  };
+
+  const filteredItems = items.filter((item) => {
+    const haystack = `${item.name || ''} ${item.number || ''} ${item.callerNumber || ''}`.toLowerCase();
+    const matchesSearch = haystack.includes(search.toLowerCase());
     if (!matchesSearch) return false;
     if (activeFilter === 'All') return true;
     return item.filterCategory === activeFilter;
   });
 
   const groupsMap = filteredItems.reduce((acc, item) => {
-    if (!acc[item.group]) acc[item.group] = [];
-    acc[item.group].push(item);
+    const key = item.group || item.dateLabel || 'Unknown';
+    if (!acc[key]) acc[key] = [];
+    acc[key].push(item);
     return acc;
   }, {});
 
   const groupKeys = Object.keys(groupsMap);
+
+  const getBadgeStyle = (item) => {
+    if (item.aiProbability > 60) {
+      return { bg: 'rgba(239, 68, 68, 0.15)', text: '#EF4444', label: 'AI' };
+    }
+    if (item.aiProbability > 30 || item.unifiedRiskScore > 50) {
+      return { bg: 'rgba(245, 158, 11, 0.15)', text: '#F59E0B', label: 'Suspicious' };
+    }
+    return { bg: 'rgba(34, 197, 94, 0.15)', text: '#22C55E', label: 'Human' };
+  };
 
   return (
     <SafeAreaView style={styles.safeArea}>
@@ -50,10 +85,11 @@ export default function HistoryScreen({ navigation }) {
       <View style={styles.container}>
         <View style={styles.header}>
           <Text style={styles.title}>History</Text>
-          <Text style={styles.subtitle}>Every call, scored and stored locally</Text>
+          <Text style={styles.subtitle}>
+            {items.length > 0 ? `${items.length} call${items.length === 1 ? '' : 's'} analyzed and secured` : 'Every call, scored and stored'}
+          </Text>
         </View>
 
-        {/* Search */}
         <View style={styles.searchContainer}>
           <Ionicons name="search-outline" size={20} color={colors.textMuted} style={styles.searchIcon} />
           <TextInput
@@ -70,7 +106,6 @@ export default function HistoryScreen({ navigation }) {
           ) : null}
         </View>
 
-        {/* Filter Pills */}
         <View style={styles.filterWrapper}>
           <ScrollView
             horizontal
@@ -95,24 +130,102 @@ export default function HistoryScreen({ navigation }) {
           </ScrollView>
         </View>
 
+        {error ? (
+          <View style={styles.errorBar}>
+            <Ionicons name="alert-circle-outline" size={16} color="#EF4444" style={{ marginRight: 6 }} />
+            <Text style={styles.errorText}>{error}</Text>
+            <TouchableOpacity onPress={loadHistory} style={styles.retryBtn}>
+              <Text style={styles.retryText}>Retry</Text>
+            </TouchableOpacity>
+          </View>
+        ) : null}
+
         <ScrollView
           style={styles.mainScroll}
           showsVerticalScrollIndicator={false}
+          refreshControl={
+            <RefreshControl
+              refreshing={refreshing}
+              onRefresh={handleRefresh}
+              tintColor="#3B82F6"
+              colors={['#3B82F6']}
+            />
+          }
           contentContainerStyle={[
             styles.scrollContent,
             { paddingBottom: Math.max(insets.bottom + 110, 120) },
           ]}
         >
-          {/* Empty state — real data will come from backend */}
-          <View style={styles.emptyContainer}>
-            <View style={styles.emptyIconCircle}>
-              <Ionicons name="time-outline" size={36} color={colors.textMuted} />
+          {isLoading && !refreshing && filteredItems.length === 0 ? (
+            <View style={styles.emptyContainer}>
+              <ActivityIndicator size="large" color="#3B82F6" />
+              <Text style={[styles.emptySub, { marginTop: 16 }]}>Loading call history...</Text>
             </View>
-            <Text style={styles.emptyTitle}>No call history yet</Text>
-            <Text style={styles.emptySub}>
-              Your call history will appear here once you make or receive calls through TruVoice.
-            </Text>
-          </View>
+          ) : filteredItems.length === 0 ? (
+            <View style={styles.emptyContainer}>
+              <View style={styles.emptyIconCircle}>
+                <Ionicons name="time-outline" size={36} color={colors.textMuted} />
+              </View>
+              <Text style={styles.emptyTitle}>No call history yet</Text>
+              <Text style={styles.emptySub}>
+                {search || activeFilter !== 'All'
+                  ? 'No results match your search or filter.'
+                  : 'Your call history will appear here once you make or receive calls through TruVoice.'}
+              </Text>
+            </View>
+          ) : (
+            groupKeys.map((groupKey) => (
+              <View key={groupKey} style={{ marginBottom: 18 }}>
+                <Text style={styles.groupHeader}>{groupKey}</Text>
+                <View style={styles.groupCard}>
+                  {groupsMap[groupKey].map((item, idx) => {
+                    const badge = getBadgeStyle(item);
+                    return (
+                      <TouchableOpacity
+                        key={item.id || idx}
+                        activeOpacity={0.7}
+                        onPress={() => navigation.navigate(ROUTES.CALL_DETAILS, { call: item })}
+                        style={[styles.callRow, idx !== groupsMap[groupKey].length - 1 && styles.callRowBorder]}
+                      >
+                        <View style={styles.callAvatar}>
+                          <Text style={styles.callInitials}>{item.initials || 'UC'}</Text>
+                        </View>
+                        <View style={styles.callInfo}>
+                          <View style={styles.callNameRow}>
+                            <Text style={styles.callName}>
+                              {item.name || item.callerNumber || item.number || 'Unknown Caller'}
+                            </Text>
+                            <View style={[styles.inlineBadge, { backgroundColor: badge.bg }]}>
+                              <Text style={[styles.inlineBadgeText, { color: badge.text }]}>
+                                {badge.label}
+                              </Text>
+                            </View>
+                          </View>
+                          <Text style={styles.callNumber}>
+                            {item.callerNumber || item.number || 'Unknown number'}
+                          </Text>
+                          {item.scamCategory ? (
+                            <Text style={styles.scamCategory}>{item.scamCategory}</Text>
+                          ) : null}
+                        </View>
+                        <View style={{ alignItems: 'flex-end' }}>
+                          <Text style={styles.callTime}>{item.time || '--:--'}</Text>
+                          <Text
+                            style={[
+                              styles.callScore,
+                              { color: item.unifiedRiskScore > 60 ? '#EF4444' : item.unifiedRiskScore > 30 ? '#F59E0B' : '#22C55E' },
+                            ]}
+                          >
+                            {item.unifiedRiskScore > 0 ? `${item.unifiedRiskScore}%` : '--'}
+                          </Text>
+                        </View>
+                      </TouchableOpacity>
+                    );
+                  })}
+                </View>
+              </View>
+            ))
+          )}
         </ScrollView>
 
         <FloatingCallButton onPress={() => navigation.navigate(ROUTES.KEYPAD)} />
@@ -200,6 +313,33 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     includeFontPadding: false,
   },
+  errorBar: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'rgba(239, 68, 68, 0.08)',
+    borderRadius: 14,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    borderWidth: 1,
+    borderColor: 'rgba(239, 68, 68, 0.2)',
+    marginVertical: 6,
+  },
+  errorText: {
+    color: '#EF4444',
+    fontSize: 13,
+    flex: 1,
+  },
+  retryBtn: {
+    paddingHorizontal: 12,
+    paddingVertical: 4,
+    borderRadius: 10,
+    backgroundColor: 'rgba(239, 68, 68, 0.15)',
+  },
+  retryText: {
+    color: '#EF4444',
+    fontSize: 12,
+    fontWeight: '600',
+  },
   mainScroll: {
     flex: 1,
   },
@@ -234,5 +374,88 @@ const styles = StyleSheet.create({
     marginTop: 8,
     textAlign: 'center',
     lineHeight: 20,
+  },
+  groupHeader: {
+    color: colors.textMuted,
+    fontSize: 12,
+    fontWeight: '600',
+    marginBottom: 8,
+    paddingHorizontal: 4,
+    letterSpacing: 0.5,
+  },
+  groupCard: {
+    backgroundColor: '#131316',
+    borderRadius: 22,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.08)',
+    paddingHorizontal: 14,
+    paddingVertical: 4,
+  },
+  callRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 12,
+  },
+  callRowBorder: {
+    borderBottomWidth: 1,
+    borderBottomColor: 'rgba(255, 255, 255, 0.06)',
+  },
+  callAvatar: {
+    width: 46,
+    height: 46,
+    borderRadius: 23,
+    backgroundColor: '#18181B',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 12,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.06)',
+  },
+  callInitials: {
+    color: '#FFFFFF',
+    fontSize: 15,
+    fontWeight: '600',
+  },
+  callInfo: {
+    flex: 1,
+  },
+  callNameRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  callName: {
+    color: '#FFFFFF',
+    fontSize: 15,
+    fontWeight: '600',
+    marginRight: 8,
+  },
+  inlineBadge: {
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    borderRadius: 8,
+  },
+  inlineBadgeText: {
+    fontSize: 10,
+    fontWeight: '700',
+  },
+  callNumber: {
+    color: colors.textMuted,
+    fontSize: 12,
+    marginTop: 2,
+  },
+  scamCategory: {
+    color: '#F59E0B',
+    fontSize: 11,
+    fontWeight: '500',
+    marginTop: 3,
+  },
+  callTime: {
+    color: colors.textMuted,
+    fontSize: 12,
+    marginBottom: 4,
+  },
+  callScore: {
+    fontSize: 14,
+    fontWeight: '700',
   },
 });

@@ -18,6 +18,7 @@ import ActiveCallScreen from '../screens/Call/ActiveCallScreen';
 import CallSummaryScreen from '../screens/Call/CallSummaryScreen';
 import CallDetailsScreen from '../screens/Call/CallDetailsScreen';
 import KeypadScreen from '../screens/Call/KeypadScreen';
+import ReportScamScreen from '../screens/Call/ReportScamScreen';
 
 const Stack = createNativeStackNavigator();
 
@@ -118,6 +119,11 @@ export default function RootNavigator() {
           name={ROUTES.KEYPAD}
           component={KeypadScreen}
           options={{ animation: 'slide_from_bottom' }}
+        />
+
+        <Stack.Screen
+          name={ROUTES.REPORT_SCAM}
+          component={ReportScamScreen}
         />
       </Stack.Navigator>
     </NavigationContainer>

@@ -1,28 +1,31 @@
-const API_BASE_URL = process.env.EXPO_PUBLIC_API_URL || 'http://localhost:8000';
-const WS_BASE_URL = process.env.EXPO_PUBLIC_WS_URL || 'ws://localhost:8000';
+const API_BASE_URL =
+  process.env.EXPO_PUBLIC_API_URL || 'http://127.0.0.1:8000';
 
 export const config = {
   apiBaseUrl: API_BASE_URL,
-  wsBaseUrl: WS_BASE_URL,
-  apiTimeout: 15000,
+  apiTimeout: 60000,
   splashDuration: 2500,
   onboardingSlides: 3,
-  callAnalysisInterval: 5000,
+  audioChunkIntervalMs: 20000,
+  otpResendCooldownSec: 60,
   maxTranscriptLines: 100,
+  historyLimit: 30,
 };
 
 export const ENDPOINTS = {
-  login: '/login',
-  register: '/register',
-  contacts: '/contacts',
-  history: '/history',
-  profile: '/profile',
-  notifications: '/notifications',
-};
-
-export const WS_CHANNELS = {
-  call: '/call',
-  voiceAnalysis: '/voice-analysis',
+  health: '/',
+  signupInitiate: '/auth/signup/initiate',
+  signupVerify: '/auth/signup/verify',
+  loginInitiate: '/auth/login/initiate',
+  loginVerify: '/auth/login/verify',
+  resendOtp: '/auth/resend-otp',
+  logout: '/auth/logout',
+  analyze: '/api/v1/analyze',
+  analysisHistory: '/api/v1/analysis-history',
+  spamStatus: (phone) =>
+    `/api/v1/spam-status/${encodeURIComponent(phone)}`,
+  spamReports: '/api/v1/spam-reports',
+  scamComplaints: '/api/v1/scam-complaints',
 };
 
 export default config;

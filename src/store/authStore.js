@@ -1,139 +1,195 @@
 import { create } from 'zustand';
 import { api, setAuthToken } from '../services/api/client';
+import { tokenStorage } from '../services/storage/tokenStorage';
 
-export const useAuthStore = create((set) => ({
+export const useAuthStore = create((set, get) => ({
   user: null,
   token: null,
   isAuthenticated: false,
   isLoading: false,
+  isHydrated: false,
   hasOnboarded: false,
+  pendingPhone: null,
+  pendingEmail: null,
+  otpPurpose: 'signup',
 
   setLoading: (loading) => set({ isLoading: loading }),
 
-  setHasOnboarded: (value) =>
-    set({
-      hasOnboarded: value,
-    }),
-
-  setUser: (user) =>
-    set({
-      user,
-      isAuthenticated: !!user,
-    }),
-
-  setToken: (token) => {
-    setAuthToken(token);
-    set({
-      token,
-      isAuthenticated: !!token,
-    });
-  },
-
-  login: async ({ email, password }) => {
-    set({ isLoading: true });
+  hydrate: async () => {
     try {
-      // Attempt API call to backend
-      const res = await api.login({ email, password });
-      const { token, user } = res.data || {};
+      const [token, user, hasOnboarded] = await Promise.all([
+        tokenStorage.getToken(),
+        tokenStorage.getUser(),
+        tokenStorage.getOnboarded(),
+      ]);
 
       if (token) {
         setAuthToken(token);
         set({
           token,
-          user: user || { id: '1', name: email.split('@')[0] || 'User', email },
+          user,
           isAuthenticated: true,
-          isLoading: false,
+          hasOnboarded,
+          isHydrated: true,
         });
-        return true;
+        return;
       }
-    } catch (e) {
-      console.log('Backend connection fallback for login:', e.message);
+    } catch (error) {
+      console.warn('Auth hydrate failed:', error.message);
     }
 
-    // Fallback demo authentication when backend is offline
-    await new Promise((resolve) => setTimeout(resolve, 800));
-    const demoToken = 'demo_truvoice_token_' + Date.now();
-    setAuthToken(demoToken);
-
-    set({
-      token: demoToken,
-      isAuthenticated: true,
-      isLoading: false,
-      user: {
-        id: '1',
-        name: email ? email.split('@')[0] : 'User',
-        email: email || '',
-        avatar: null,
-      },
-    });
-    return true;
+    set({ isHydrated: true, hasOnboarded: false });
   },
 
-  register: async ({ name, email, password }) => {
+  setHasOnboarded: async (value) => {
+    await tokenStorage.setOnboarded(value);
+    set({ hasOnboarded: value });
+  },
+
+  _persistSession: async (accessToken, user) => {
+    setAuthToken(accessToken);
+    await tokenStorage.saveSession(accessToken, user);
+    set({
+      token: accessToken,
+      user,
+      isAuthenticated: true,
+      isLoading: false,
+      pendingPhone: null,
+      pendingEmail: null,
+    });
+  },
+
+  initiateSignup: async ({ name, age, email, phone_number, password }) => {
     set({ isLoading: true });
     try {
-      await api.register({ name, email, password });
-    } catch (e) {
-      console.log('Backend connection fallback for register:', e.message);
+      const response = await api.signupInitiate({
+        name,
+        age: Number(age),
+        email,
+        phone_number,
+        password,
+      });
+
+      set({
+        isLoading: false,
+        pendingPhone: phone_number,
+        pendingEmail: email,
+        otpPurpose: 'signup',
+        user: { name, email, phone_number },
+      });
+
+      return response.data;
+    } catch (error) {
+      set({ isLoading: false });
+      throw error;
+    }
+  },
+
+  verifySignup: async (otp) => {
+    const phone_number = get().pendingPhone;
+    if (!phone_number) throw new Error('Missing phone number for verification.');
+
+    set({ isLoading: true });
+    try {
+      const response = await api.signupVerify({
+        phone_number,
+        otp,
+        purpose: 'signup',
+      });
+
+      const { access_token, user_id, phone_number: phone } = response.data;
+      const existingUser = get().user || {};
+
+      await get()._persistSession(access_token, {
+        id: user_id,
+        name: existingUser.name || 'TruVoice User',
+        email: existingUser.email || '',
+        phone_number: phone,
+      });
+
+      return response.data;
+    } catch (error) {
+      set({ isLoading: false });
+      throw error;
+    }
+  },
+
+  initiateLogin: async ({ phone_number, password }) => {
+    set({ isLoading: true });
+    try {
+      const response = await api.loginInitiate({ phone_number, password });
+      set({
+        isLoading: false,
+        pendingPhone: phone_number,
+        otpPurpose: 'login',
+      });
+      return response.data;
+    } catch (error) {
+      set({ isLoading: false });
+      throw error;
+    }
+  },
+
+  verifyLogin: async (otp) => {
+    const phone_number = get().pendingPhone;
+    if (!phone_number) throw new Error('Missing phone number for verification.');
+
+    set({ isLoading: true });
+    try {
+      const response = await api.loginVerify({
+        phone_number,
+        otp,
+        purpose: 'login',
+      });
+
+      const { access_token, user_id, phone_number: phone } = response.data;
+
+      await get()._persistSession(access_token, {
+        id: user_id,
+        name: get().user?.name || 'TruVoice User',
+        email: get().user?.email || '',
+        phone_number: phone,
+      });
+
+      return response.data;
+    } catch (error) {
+      set({ isLoading: false });
+      throw error;
+    }
+  },
+
+  resendOtp: async () => {
+    const phone_number = get().pendingPhone;
+    const purpose = get().otpPurpose;
+    if (!phone_number) throw new Error('Missing phone number.');
+
+    set({ isLoading: true });
+    try {
+      const response = await api.resendOtp({ phone_number, purpose });
+      set({ isLoading: false });
+      return response.data;
+    } catch (error) {
+      set({ isLoading: false });
+      throw error;
+    }
+  },
+
+  logout: async () => {
+    try {
+      await api.logout();
+    } catch {
+      // still clear local session if backend logout fails
     }
 
-    await new Promise((resolve) => setTimeout(resolve, 800));
-    set({
-      isLoading: false,
-      pendingUser: {
-        name,
-        email,
-      },
-    });
-    return true;
-  },
-
-  verifyOTP: async (code) => {
-    set({ isLoading: true });
-    await new Promise((resolve) => setTimeout(resolve, 800));
-
-    const demoToken = 'demo_otp_token_' + Date.now();
-    setAuthToken(demoToken);
-
-    set({
-      token: demoToken,
-      isAuthenticated: true,
-      isLoading: false,
-      user: {
-        id: '1',
-        name: 'User',
-        email: '',
-      },
-    });
-
-    return true;
-  },
-
-  loginAsGuest: async () => {
-    set({ isLoading: true });
-    await new Promise((resolve) => setTimeout(resolve, 500));
-
-    const guestToken = 'guest_token_' + Date.now();
-    setAuthToken(guestToken);
-
-    set({
-      isLoading: false,
-      isAuthenticated: true,
-      token: guestToken,
-      user: {
-        id: 'guest',
-        name: 'Guest User',
-        email: 'guest@truvoice.app',
-      },
-    });
-  },
-
-  logout: () => {
     setAuthToken(null);
+    await tokenStorage.clearSession();
+
     set({
       token: null,
       user: null,
       isAuthenticated: false,
+      pendingPhone: null,
+      pendingEmail: null,
     });
   },
 }));

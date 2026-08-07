@@ -7,6 +7,7 @@ import {
   SafeAreaView,
   StatusBar,
   Platform,
+  Alert,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -132,8 +133,11 @@ export default function OutgoingCallScreen({ navigation, route }) {
           <TouchableOpacity
             activeOpacity={0.7}
             onPress={() => {
-              // Simulated Add Caller dialog
-              alert("Conference calling is not supported in demo mode. Choose a contact to add once connected to backend.");
+              Alert.alert(
+                'Add Caller',
+                'Conference calling is not supported in demo mode. Choose a contact to add once connected to backend.',
+                [{ text: 'OK' }],
+              );
             }}
             style={styles.controlBtn}
           >
