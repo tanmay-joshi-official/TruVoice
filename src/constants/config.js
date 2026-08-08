@@ -1,8 +1,24 @@
-const API_BASE_URL =
-  process.env.EXPO_PUBLIC_API_URL || 'http://127.0.0.1:8000';
+import { Platform } from 'react-native';
+import Constants from 'expo-constants';
+
+const appConfigApiUrl =
+  Constants.expoConfig?.extra?.apiUrl ||
+  Constants.manifest?.extra?.apiUrl;
+const envApiUrl =
+  appConfigApiUrl ||
+  process.env.EXPO_PUBLIC_API_URL ||
+  process.env.REACT_NATIVE_API_URL ||
+  process.env.API_URL ||
+  process.env.NEXT_PUBLIC_API_URL;
+
+const DEFAULT_API_BASE_URL = envApiUrl
+  ? envApiUrl
+  : Platform.OS === 'android'
+  ? 'http://10.0.2.2:8000'
+  : 'http://localhost:8000';
 
 export const config = {
-  apiBaseUrl: API_BASE_URL,
+  apiBaseUrl: DEFAULT_API_BASE_URL,
   apiTimeout: 60000,
   splashDuration: 2500,
   onboardingSlides: 3,
