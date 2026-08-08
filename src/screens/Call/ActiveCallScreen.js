@@ -102,7 +102,7 @@ export default function ActiveCallScreen({ navigation, route }) {
     aiStore.reset();
     transcriptLinesRef.current = [];
     lastAnalysisRef.current = null;
-  }, [aiStore]);
+  }, []);
 
   useEffect(() => {
     const timer = setInterval(() => {
