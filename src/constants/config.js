@@ -17,8 +17,13 @@ const DEFAULT_API_BASE_URL = envApiUrl
   ? 'http://10.0.2.2:8000'
   : 'http://localhost:8000';
 
+const DEFAULT_WS_BASE_URL = DEFAULT_API_BASE_URL
+  .replace(/^http:/, 'ws:')
+  .replace(/^https:/, 'wss:');
+
 export const config = {
   apiBaseUrl: DEFAULT_API_BASE_URL,
+  wsBaseUrl: DEFAULT_WS_BASE_URL,
   apiTimeout: 60000,
   splashDuration: 2500,
   onboardingSlides: 3,
@@ -42,6 +47,15 @@ export const ENDPOINTS = {
     `/api/v1/spam-status/${encodeURIComponent(phone)}`,
   spamReports: '/api/v1/spam-reports',
   scamComplaints: '/api/v1/scam-complaints',
+
+  // Real-Time Voice Endpoints
+  voiceToken: '/api/v1/voice/token',
+  voiceOutgoing: '/api/v1/voice/outgoing',
+  voiceCalls: '/api/v1/voice/calls',
+  voiceCallDetail: (id) => `/api/v1/voice/calls/${encodeURIComponent(id)}`,
+  wsLiveAnalysis: (callId, token) =>
+    `${DEFAULT_WS_BASE_URL}/ws/live-analysis/${callId}?token=${encodeURIComponent(token)}`,
 };
 
 export default config;
+

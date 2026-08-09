@@ -16,6 +16,9 @@ import { Audio } from 'expo-av';
 import { ROUTES } from '../../constants/routes';
 import { colors } from '../../theme';
 
+import { voiceService } from '../../services/voice/voiceService';
+import { useCallStore } from '../../store/callStore';
+
 export default function OutgoingCallScreen({ navigation, route }) {
   const insets = useSafeAreaInsets();
   const contact = route.params?.contact || {
@@ -28,15 +31,53 @@ export default function OutgoingCallScreen({ navigation, route }) {
   const [isSpeaker, setIsSpeaker] = useState(false);
   const [showKeypad, setShowKeypad] = useState(false);
   const [dtmfText, setDtmfText] = useState('');
+  const [callStatusText, setCallStatusText] = useState('Calling...');
 
-  // Auto-connect call demo simulation
+  const setCallId = useCallStore((s) => s.setCallId);
+  const setPhoneNumber = useCallStore((s) => s.setPhoneNumber);
+
   useEffect(() => {
-    const timer = setTimeout(() => {
-      navigation.replace(ROUTES.ACTIVE_CALL, { contact });
-    }, 4500);
+    let isMounted = true;
 
-    return () => clearTimeout(timer);
-  }, [navigation, contact]);
+    async function startCall() {
+      try {
+        const targetNumber = contact.number || contact.phone_number || '+1234567890';
+        setPhoneNumber(targetNumber);
+        
+        const response = await voiceService.startOutgoingCall(targetNumber);
+        if (isMounted && response?.call_id) {
+          setCallId(response.call_id);
+          setCallStatusText('Ringing...');
+          
+          setTimeout(() => {
+            if (isMounted) {
+              navigation.replace(ROUTES.ACTIVE_CALL, {
+                contact,
+                callId: response.call_id,
+              });
+            }
+          }, 2000);
+        }
+      } catch (err) {
+        console.warn('Outgoing call error:', err);
+        if (isMounted) {
+          setCallStatusText('Connecting fallback call...');
+          setTimeout(() => {
+            if (isMounted) {
+              navigation.replace(ROUTES.ACTIVE_CALL, { contact });
+            }
+          }, 2500);
+        }
+      }
+    }
+
+    startCall();
+
+    return () => {
+      isMounted = false;
+    };
+  }, [navigation, contact, setCallId, setPhoneNumber]);
+
 
   const handleToggleSpeaker = async () => {
     try {

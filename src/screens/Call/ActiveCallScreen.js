@@ -29,6 +29,9 @@ import { analysisService } from '../../services/analysis/analysisService';
 import { useAiDetectionStore } from '../../store/aiDetectionStore';
 import { useHistoryStore } from '../../store/historyStore';
 import { useContactsStore } from '../../store/contactsStore';
+import { useCallStore } from '../../store/callStore';
+import { useVoiceAnalysis } from '../../hooks/useVoiceAnalysis';
+
 
 function PulseRing() {
   const scale = useSharedValue(1);
@@ -83,6 +86,16 @@ export default function ActiveCallScreen({ navigation, route }) {
   const transcriptLinesRef = useRef([]);
   const lastAnalysisRef = useRef(null);
 
+  const activeCallId = route.params?.callId || useCallStore((s) => s.callId);
+  useVoiceAnalysis(activeCallId);
+
+  const realTimeTrustScore = useCallStore((s) => s.trustScore);
+  const realTimeRiskLevel = useCallStore((s) => s.riskLevel);
+  const realTimeTranscript = useCallStore((s) => s.transcript);
+  const realTimeSignals = useCallStore((s) => s.signals);
+  const riskAlert = useCallStore((s) => s.riskAlert);
+  const connectionState = useCallStore((s) => s.connectionState);
+
   const storeContacts = useContactsStore((s) => s.contacts);
   const aiStore = useAiDetectionStore();
   const prependHistoryItem = useHistoryStore((s) => s.prependItem);
@@ -97,6 +110,7 @@ export default function ActiveCallScreen({ navigation, route }) {
 
   const callerNumber = contact.number || contact.phone_number || '';
   const shouldAnalyze = !isSavedContact && !analysisStopped;
+
 
   useEffect(() => {
     aiStore.reset();

@@ -88,6 +88,17 @@ export const api = {
       phone_number: phoneNumber,
       description,
     }),
+
+  // Voice Calling API
+  getVoiceToken: () => apiClient.post(ENDPOINTS.voiceToken),
+
+  initiateOutgoingCall: (phoneNumber) =>
+    apiClient.post(ENDPOINTS.voiceOutgoing, { phone_number: phoneNumber }),
+
+  getVoiceCalls: () => apiClient.get(ENDPOINTS.voiceCalls),
+
+  getVoiceCallDetail: (callId) => apiClient.get(ENDPOINTS.voiceCallDetail(callId)),
 };
+
 
 export default apiClient;
