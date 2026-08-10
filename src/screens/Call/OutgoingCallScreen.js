@@ -16,67 +16,122 @@ import { Audio } from 'expo-av';
 import { ROUTES } from '../../constants/routes';
 import { colors } from '../../theme';
 
-import { voiceService } from '../../services/voice/voiceService';
+import { agoraService } from '../../services/agora/agoraService';
+import { api } from '../../services/api/client';
 import { useCallStore } from '../../store/callStore';
 
 export default function OutgoingCallScreen({ navigation, route }) {
   const insets = useSafeAreaInsets();
   const contact = route.params?.contact || {
-    name: 'Unknown Caller',
+    name: 'Unknown User',
     number: '',
-    initials: 'UC',
+    initials: 'UU',
+    userId: 'target-user-id',
   };
 
   const [isMuted, setIsMuted] = useState(false);
   const [isSpeaker, setIsSpeaker] = useState(false);
   const [showKeypad, setShowKeypad] = useState(false);
   const [dtmfText, setDtmfText] = useState('');
-  const [callStatusText, setCallStatusText] = useState('Calling...');
+  const [callStatusText, setCallStatusText] = useState('Calling User...');
 
   const setCallId = useCallStore((s) => s.setCallId);
-  const setPhoneNumber = useCallStore((s) => s.setPhoneNumber);
+  const setChannelName = useCallStore((s) => s.setChannelName);
 
   useEffect(() => {
     let isMounted = true;
+    let timeoutTimer = null;
 
-    async function startCall() {
+    async function initiateAgoraCall() {
       try {
-        const targetNumber = contact.number || contact.phone_number || '+1234567890';
-        setPhoneNumber(targetNumber);
-        
-        const response = await voiceService.startOutgoingCall(targetNumber);
-        if (isMounted && response?.call_id) {
-          setCallId(response.call_id);
-          setCallStatusText('Ringing...');
-          
-          setTimeout(() => {
-            if (isMounted) {
-              navigation.replace(ROUTES.ACTIVE_CALL, {
-                contact,
-                callId: response.call_id,
-              });
+        const targetUserId = contact.userId || contact.number || 'target-user-id';
+        const channelName = `truvoice_${Date.now()}_${Math.floor(Math.random() * 1000)}`;
+
+        setChannelName(channelName);
+
+        // 1. Log call to backend database
+        const logRes = await api.logCall(channelName, targetUserId);
+        const callId = logRes.data?.call_id;
+        if (callId) setCallId(callId);
+
+        // 2. Dispatch RTM call invite to target user
+        await agoraService.sendCallInvitation(targetUserId, channelName, callId, 'Caller');
+
+        if (isMounted) setCallStatusText('Ringing...');
+
+        // 3. Setup 30-second no answer timeout
+        timeoutTimer = setTimeout(() => {
+          if (isMounted) {
+            setCallStatusText('No Answer');
+            if (callId) api.updateCallStatus(callId, 'canceled');
+            setTimeout(() => navigation.goBack(), 1500);
+          }
+        }, 30000);
+
+        // 4. Listen for RTM response
+        const handleResponse = async (eventData) => {
+          if (!isMounted) return;
+          if (eventData.channelName === channelName) {
+            clearTimeout(timeoutTimer);
+
+            if (eventData.action === 'accept') {
+              setCallStatusText('Connecting Audio...');
+              try {
+                // Fetch Agora RTC Token
+                const tokenRes = await api.getAgoraToken(channelName);
+                const token = tokenRes.data?.token;
+
+                // Join Agora Audio Channel
+                await agoraService.joinChannel(channelName, token, 0);
+
+                if (callId) api.updateCallStatus(callId, 'answered');
+
+                navigation.replace(ROUTES.ACTIVE_CALL, {
+                  contact,
+                  callId,
+                  channelName,
+                });
+              } catch (e) {
+                console.warn('Error joining RTC channel:', e);
+                navigation.goBack();
+              }
+            } else if (eventData.action === 'decline') {
+              setCallStatusText('Call Declined');
+              if (callId) api.updateCallStatus(callId, 'declined');
+              setTimeout(() => navigation.goBack(), 1500);
+            } else if (eventData.action === 'busy') {
+              setCallStatusText('User is Busy');
+              if (callId) api.updateCallStatus(callId, 'busy');
+              setTimeout(() => navigation.goBack(), 1500);
             }
+          }
+        };
+
+        agoraService.on('call_response', handleResponse);
+
+        return () => {
+          agoraService.off('call_response', handleResponse);
+        };
+      } catch (err) {
+        console.warn('Outgoing Agora call error:', err);
+        if (isMounted) {
+          setCallStatusText('Call Failed');
+          setTimeout(() => {
+            if (isMounted) navigation.goBack();
           }, 2000);
         }
-      } catch (err) {
-        console.warn('Outgoing call error:', err);
-        if (isMounted) {
-          setCallStatusText('Connecting fallback call...');
-          setTimeout(() => {
-            if (isMounted) {
-              navigation.replace(ROUTES.ACTIVE_CALL, { contact });
-            }
-          }, 2500);
-        }
       }
+
     }
 
-    startCall();
+    initiateAgoraCall();
 
     return () => {
       isMounted = false;
+      if (timeoutTimer) clearTimeout(timeoutTimer);
     };
-  }, [navigation, contact, setCallId, setPhoneNumber]);
+  }, [navigation, contact, setCallId, setChannelName]);
+
 
 
   const handleToggleSpeaker = async () => {

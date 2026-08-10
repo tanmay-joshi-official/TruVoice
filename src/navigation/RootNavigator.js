@@ -18,9 +18,13 @@ import ActiveCallScreen from '../screens/Call/ActiveCallScreen';
 import CallSummaryScreen from '../screens/Call/CallSummaryScreen';
 import CallDetailsScreen from '../screens/Call/CallDetailsScreen';
 import KeypadScreen from '../screens/Call/KeypadScreen';
+import ContactsScreen from '../screens/Contacts/ContactsScreen';
 import ReportScamScreen from '../screens/Call/ReportScamScreen';
 
+import IncomingCallOverlay from '../components/IncomingCallOverlay';
+
 const Stack = createNativeStackNavigator();
+
 
 const navTheme = {
   ...DarkTheme,
@@ -37,7 +41,9 @@ const navTheme = {
 export default function RootNavigator() {
   return (
     <NavigationContainer theme={navTheme}>
+      <IncomingCallOverlay />
       <Stack.Navigator
+
         initialRouteName={ROUTES.SPLASH}
         screenOptions={{
           headerShown: false,
@@ -125,7 +131,13 @@ export default function RootNavigator() {
           name={ROUTES.REPORT_SCAM}
           component={ReportScamScreen}
         />
+
+        <Stack.Screen
+          name={ROUTES.CONTACTS}
+          component={ContactsScreen}
+        />
       </Stack.Navigator>
     </NavigationContainer>
+
   );
 }

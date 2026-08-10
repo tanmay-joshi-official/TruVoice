@@ -89,16 +89,23 @@ export const api = {
       description,
     }),
 
-  // Voice Calling API
-  getVoiceToken: () => apiClient.post(ENDPOINTS.voiceToken),
+  // Agora Voice Calling API
+  getAgoraToken: (channelName) =>
+    apiClient.post(ENDPOINTS.voiceToken, { channelName }),
 
-  initiateOutgoingCall: (phoneNumber) =>
-    apiClient.post(ENDPOINTS.voiceOutgoing, { phone_number: phoneNumber }),
+  logCall: (channelName, targetUserId) =>
+    apiClient.post(ENDPOINTS.voiceLogCall, { channelName, targetUserId }),
+
+  updateCallStatus: (callId, status, duration = 0) =>
+    apiClient.post(ENDPOINTS.voiceUpdateCall, { call_id: callId, status, duration }),
+
+  getAppUsers: () => apiClient.get(ENDPOINTS.voiceUsers),
 
   getVoiceCalls: () => apiClient.get(ENDPOINTS.voiceCalls),
 
   getVoiceCallDetail: (callId) => apiClient.get(ENDPOINTS.voiceCallDetail(callId)),
 };
+
 
 
 export default apiClient;

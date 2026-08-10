@@ -2,17 +2,25 @@ import { create } from 'zustand';
 
 export const CALL_STATUS = {
   IDLE: 'idle',
+  INVITING: 'inviting',
   INCOMING: 'incoming',
   OUTGOING: 'outgoing',
   RINGING: 'ringing',
   CONNECTING: 'connecting',
   ACTIVE: 'active',
   ENDED: 'ended',
+  DECLINED: 'declined',
+  BUSY: 'busy',
 };
 
 export const useCallStore = create((set, get) => ({
   callId: null,
+  channelName: null,
+  targetUserId: null,
+  callerUser: null,
   phoneNumber: null,
+  incomingCall: null,
+
   status: CALL_STATUS.IDLE,
   connectionState: 'disconnected',
   activeCall: null,
@@ -37,7 +45,13 @@ export const useCallStore = create((set, get) => ({
 
   // Actions
   setCallId: (callId) => set({ callId }),
+  setChannelName: (channelName) => set({ channelName }),
+  setTargetUserId: (targetUserId) => set({ targetUserId }),
+  setCallerUser: (callerUser) => set({ callerUser }),
   setPhoneNumber: (phoneNumber) => set({ phoneNumber }),
+  setIncomingCall: (incomingCall) => set({ incomingCall, status: CALL_STATUS.INCOMING }),
+  clearIncomingCall: () => set({ incomingCall: null }),
+
   setStatus: (status) => set({ status }),
   setConnectionState: (connectionState) => set({ connectionState }),
   setActiveCall: (activeCall) => set({ activeCall }),
@@ -56,7 +70,11 @@ export const useCallStore = create((set, get) => ({
   resetCall: () =>
     set({
       callId: null,
+      channelName: null,
+      targetUserId: null,
+      callerUser: null,
       phoneNumber: null,
+      incomingCall: null,
       status: CALL_STATUS.IDLE,
       connectionState: 'disconnected',
       activeCall: null,

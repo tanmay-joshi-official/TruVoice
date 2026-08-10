@@ -24,6 +24,7 @@ const DEFAULT_WS_BASE_URL = DEFAULT_API_BASE_URL
 export const config = {
   apiBaseUrl: DEFAULT_API_BASE_URL,
   wsBaseUrl: DEFAULT_WS_BASE_URL,
+  agoraAppId: process.env.EXPO_PUBLIC_AGORA_APP_ID || Constants.expoConfig?.extra?.agoraAppId || 'agora_demo_app_id',
   apiTimeout: 60000,
   splashDuration: 2500,
   onboardingSlides: 3,
@@ -48,14 +49,17 @@ export const ENDPOINTS = {
   spamReports: '/api/v1/spam-reports',
   scamComplaints: '/api/v1/scam-complaints',
 
-  // Real-Time Voice Endpoints
+  // Real-Time Agora Voice Endpoints
   voiceToken: '/api/v1/voice/token',
-  voiceOutgoing: '/api/v1/voice/outgoing',
+  voiceLogCall: '/api/v1/voice/log-call',
+  voiceUpdateCall: '/api/v1/voice/update-call',
+  voiceUsers: '/api/v1/voice/users',
   voiceCalls: '/api/v1/voice/calls',
   voiceCallDetail: (id) => `/api/v1/voice/calls/${encodeURIComponent(id)}`,
   wsLiveAnalysis: (callId, token) =>
     `${DEFAULT_WS_BASE_URL}/ws/live-analysis/${callId}?token=${encodeURIComponent(token)}`,
 };
+
 
 export default config;
 

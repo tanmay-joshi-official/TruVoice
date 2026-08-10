@@ -312,7 +312,8 @@ export default function CallDetailsScreen({ navigation, route }) {
           </TouchableOpacity>
         </ScrollView>
 
-        <FloatingCallButton onPress={() => navigation.navigate(ROUTES.CONTACTS)} />
+        <FloatingCallButton onPress={() => navigation.navigate(ROUTES.KEYPAD)} />
+
       </View>
     </SafeAreaView>
   );

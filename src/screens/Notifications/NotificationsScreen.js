@@ -120,7 +120,8 @@ export default function NotificationsScreen({ navigation }) {
           </View>
         </ScrollView>
 
-        <FloatingCallButton onPress={() => navigation.navigate(ROUTES.CONTACTS)} />
+        <FloatingCallButton onPress={() => navigation.navigate(ROUTES.KEYPAD)} />
+
       </View>
     </SafeAreaView>
   );

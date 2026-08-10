@@ -31,6 +31,9 @@ import { useHistoryStore } from '../../store/historyStore';
 import { useContactsStore } from '../../store/contactsStore';
 import { useCallStore } from '../../store/callStore';
 import { useVoiceAnalysis } from '../../hooks/useVoiceAnalysis';
+import { agoraService } from '../../services/agora/agoraService';
+import { api } from '../../services/api/client';
+
 
 
 function PulseRing() {
@@ -216,8 +219,16 @@ export default function ActiveCallScreen({ navigation, route }) {
     audioChunker.setAnalysisStopped(false);
   }, []);
 
-  const handleEndCall = () => {
+  const handleEndCall = async () => {
     audioChunker.stopChunking();
+    try {
+      await agoraService.leaveChannel();
+      if (activeCallId) {
+        api.updateCallStatus(activeCallId, 'ended', seconds);
+      }
+    } catch (e) {
+      console.warn('Error ending Agora call:', e);
+    }
     const duration = `${Math.floor(seconds / 60)}m ${seconds % 60}s`;
     navigation.replace(ROUTES.CALL_SUMMARY, {
       contact,
@@ -227,6 +238,7 @@ export default function ActiveCallScreen({ navigation, route }) {
       lastAnalysis: lastAnalysisRef.current,
     });
   };
+
 
   const formatTimer = (sec) => {
     const m = Math.floor(sec / 60);
