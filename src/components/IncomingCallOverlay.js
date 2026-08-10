@@ -12,9 +12,11 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { useCallStore } from '../store/callStore';
 import { agoraService } from '../services/agora/agoraService';
 import { api } from '../services/api/client';
+import { useNavigation } from '@react-navigation/native';
 import { ROUTES } from '../constants/routes';
 
-export default function IncomingCallOverlay({ navigation }) {
+export default function IncomingCallOverlay() {
+  const navigation = useNavigation();
   const incomingCall = useCallStore((s) => s.incomingCall);
   const clearIncomingCall = useCallStore((s) => s.clearIncomingCall);
   const setCallId = useCallStore((s) => s.setCallId);
