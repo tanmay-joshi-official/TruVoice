@@ -1,5 +1,6 @@
-import { config } from '../../constants/config';
+import { config, ENDPOINTS } from '../../constants/config';
 import { api } from '../api/client';
+import { useCallStore } from '../../store/callStore';
 
 class AgoraService {
   constructor() {
@@ -10,14 +11,19 @@ class AgoraService {
     this.isLoggedIn = false;
     this.userId = null;
     this.eventListeners = {};
+    this.ws = null;
+    this.pollerInterval = null;
+    this.pingInterval = null;
+    this.authToken = null;
   }
 
-  async init(userId) {
+  async init(userId, authToken) {
     if (!userId) return;
     this.userId = String(userId);
+    if (authToken) this.authToken = authToken;
 
     try {
-      // Try loading native Agora modules if available
+      // Try loading native Agora RTC modules if available
       try {
         const { createAgoraRtcEngine } = require('react-native-agora');
         this.rtcEngine = createAgoraRtcEngine();
@@ -28,10 +34,107 @@ class AgoraService {
       }
 
       this.isLoggedIn = true;
-      console.log(`Agora RTM signaling logged in for user: ${this.userId}`);
+      console.log(`Agora service initialized for user: ${this.userId}`);
+
+      // Start real-time WebSocket signaling connection & poller
+      if (this.authToken) {
+        this.connectSignaling(this.authToken);
+      }
+      this.startPendingCallPoller();
     } catch (err) {
       console.warn('Agora initialization error:', err);
     }
+  }
+
+  connectSignaling(token) {
+    if (!token) return;
+    this.authToken = token;
+
+    try {
+      if (this.ws) {
+        try { this.ws.close(); } catch (e) {}
+      }
+
+      const wsUrl = ENDPOINTS.wsSignaling(token);
+      console.log('Connecting to user call signaling WebSocket:', wsUrl);
+      this.ws = new WebSocket(wsUrl);
+
+      this.ws.onopen = () => {
+        console.log('User call signaling WebSocket connected.');
+        if (this.pingInterval) clearInterval(this.pingInterval);
+        this.pingInterval = setInterval(() => {
+          if (this.ws && this.ws.readyState === WebSocket.OPEN) {
+            this.ws.send('ping');
+          }
+        }, 15000);
+      };
+
+      this.ws.onmessage = (event) => {
+        try {
+          if (event.data === 'pong') return;
+          const msg = JSON.parse(event.data);
+          console.log('Signaling message received:', msg);
+
+          if (msg.type === 'incoming_call') {
+            useCallStore.getState().setIncomingCall({
+              callId: msg.callId,
+              channelName: msg.channelName,
+              callerUserId: msg.callerUserId,
+              callerName: msg.callerName || 'Incoming Caller',
+            });
+          } else if (msg.type === 'call_response') {
+            this.emit('call_response', {
+              callId: msg.callId,
+              action: msg.action,
+              channelName: msg.channelName,
+            });
+          }
+        } catch (e) {
+          console.warn('Error parsing signaling message:', e);
+        }
+      };
+
+      this.ws.onclose = () => {
+        console.log('User signaling WebSocket closed. Reconnecting in 5s...');
+        if (this.pingInterval) clearInterval(this.pingInterval);
+        setTimeout(() => {
+          if (this.authToken && this.isLoggedIn) {
+            this.connectSignaling(this.authToken);
+          }
+        }, 5000);
+      };
+
+      this.ws.onerror = (err) => {
+        console.warn('User signaling WebSocket error:', err.message);
+      };
+    } catch (e) {
+      console.warn('Failed to establish user signaling WebSocket:', e);
+    }
+  }
+
+  startPendingCallPoller() {
+    if (this.pollerInterval) clearInterval(this.pollerInterval);
+    this.pollerInterval = setInterval(async () => {
+      try {
+        if (!this.isLoggedIn) return;
+        const state = useCallStore.getState();
+        if (state.incomingCall || state.status === 'active') return;
+
+        const res = await api.getPendingCall();
+        if (res.data?.has_pending) {
+          const { callId, channelName, callerUserId, callerName } = res.data;
+          console.log('Pending call detected via poller:', res.data);
+          useCallStore.getState().setIncomingCall({
+            callId,
+            channelName,
+            callerUserId,
+            callerName: callerName || 'Incoming Caller',
+          });
+        }
+      } catch (e) {
+        // Silent poller catch
+      }
+    }, 4000);
   }
 
   on(event, callback) {
@@ -54,19 +157,16 @@ class AgoraService {
   }
 
   async sendCallInvitation(targetUserId, channelName, callId, callerName) {
-    console.log(`Sending Agora RTM call invite to ${targetUserId} for channel ${channelName}`);
-    // Simulate RTM signaling event dispatch
-    this.emit('call_invited', {
-      targetUserId,
-      channelName,
-      callId,
-      callerName,
-    });
+    console.log(`Sending call invite to ${targetUserId} for channel ${channelName}`);
+    // api.logCall automatically dispatches real-time WebSocket invite to target user
     return { status: 'sent', channelName, callId };
   }
 
-  async respondToCallInvitation(callerUserId, action, channelName) {
-    console.log(`Responding to call invitation from ${callerUserId}: ${action}`);
+  async respondToCallInvitation(callerUserId, action, channelName, callId) {
+    console.log(`Responding to call invitation: ${action}`);
+    if (callId) {
+      await api.updateCallStatus(callId, action);
+    }
     this.emit('call_response', {
       callerUserId,
       action,
@@ -116,6 +216,14 @@ class AgoraService {
       }
     } catch (e) {
       console.warn('Error setting speaker state:', e);
+    }
+  }
+
+  cleanup() {
+    if (this.pollerInterval) clearInterval(this.pollerInterval);
+    if (this.pingInterval) clearInterval(this.pingInterval);
+    if (this.ws) {
+      try { this.ws.close(); } catch (e) {}
     }
   }
 }

@@ -20,6 +20,7 @@ import FloatingCallButton from '../../components/buttons/FloatingCallButton';
 import { ROUTES } from '../../constants/routes';
 import { useContactsStore } from '../../store/contactsStore';
 import { useAuthStore } from '../../store';
+import { agoraService } from '../../services/agora/agoraService';
 import { colors } from '../../theme';
 
 export default function HomeScreen({ navigation }) {
@@ -27,6 +28,7 @@ export default function HomeScreen({ navigation }) {
   const [searchQuery, setSearchQuery] = useState('');
   const { loadContacts } = useContactsStore();
   const user = useAuthStore((s) => s.user);
+  const token = useAuthStore((s) => s.token);
 
   const firstName = (user?.name || 'User').split(' ')[0];
   const userInitials = (user?.name || 'U')
@@ -38,7 +40,11 @@ export default function HomeScreen({ navigation }) {
 
   useEffect(() => {
     loadContacts();
-  }, []);
+    if (user?.id && token) {
+      agoraService.init(user.id, token);
+    }
+  }, [user, token]);
+
 
   const handleStartCall = () => {
     navigation.navigate(ROUTES.KEYPAD);

@@ -103,8 +103,11 @@ export const api = {
 
   getVoiceCalls: () => apiClient.get(ENDPOINTS.voiceCalls),
 
+  getPendingCall: () => apiClient.get(ENDPOINTS.voicePendingCall),
+
   getVoiceCallDetail: (callId) => apiClient.get(ENDPOINTS.voiceCallDetail(callId)),
 };
+
 
 
 

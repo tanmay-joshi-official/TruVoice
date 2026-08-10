@@ -1,6 +1,7 @@
 import { create } from 'zustand';
 import { api, setAuthToken } from '../services/api/client';
 import { tokenStorage } from '../services/storage/tokenStorage';
+import { agoraService } from '../services/agora/agoraService';
 
 export const useAuthStore = create((set, get) => ({
   user: null,
@@ -32,6 +33,9 @@ export const useAuthStore = create((set, get) => ({
           hasOnboarded,
           isHydrated: true,
         });
+        if (user?.id) {
+          agoraService.init(user.id, token);
+        }
         return;
       }
     } catch (error) {
@@ -57,7 +61,11 @@ export const useAuthStore = create((set, get) => ({
       pendingPhone: null,
       pendingEmail: null,
     });
+    if (user?.id) {
+      agoraService.init(user.id, accessToken);
+    }
   },
+
 
   initiateSignup: async ({ name, age, email, phone_number, password }) => {
     set({ isLoading: true });

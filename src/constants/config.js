@@ -49,16 +49,19 @@ export const ENDPOINTS = {
   spamReports: '/api/v1/spam-reports',
   scamComplaints: '/api/v1/scam-complaints',
 
-  // Real-Time Agora Voice Endpoints
   voiceToken: '/api/v1/voice/token',
   voiceLogCall: '/api/v1/voice/log-call',
   voiceUpdateCall: '/api/v1/voice/update-call',
   voiceUsers: '/api/v1/voice/users',
   voiceCalls: '/api/v1/voice/calls',
+  voicePendingCall: '/api/v1/voice/pending-call',
   voiceCallDetail: (id) => `/api/v1/voice/calls/${encodeURIComponent(id)}`,
+  wsSignaling: (token) =>
+    `${DEFAULT_WS_BASE_URL}/ws/signaling?token=${encodeURIComponent(token)}`,
   wsLiveAnalysis: (callId, token) =>
     `${DEFAULT_WS_BASE_URL}/ws/live-analysis/${callId}?token=${encodeURIComponent(token)}`,
 };
+
 
 
 export default config;
