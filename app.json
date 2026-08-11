@@ -28,6 +28,12 @@
     },
     "plugins": [
       "expo-font"
-    ]
+    ],
+    "extra": {
+      "apiUrl": "http://192.168.1.3:8000",
+      "eas": {
+        "projectId": "53c2bbbc-b4b1-4b96-8c07-92cf97285ba6"
+      }
+    }
   }
 }
