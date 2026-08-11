@@ -48,10 +48,10 @@ export const api = {
       return Promise.reject(new Error('Audio file is missing.'));
     }
 
-    const isMp3 = /\.mp3($|\?)/i.test(fileUri) || /truvoice_.*\.mp3/i.test(fileUri);
-    if (!isMp3) {
+    const isValidAudio = /\.(m4a|mp3|wav|aac|flac)($|\?)/i.test(fileUri) || /truvoice_chunk/i.test(fileUri);
+    if (!isValidAudio) {
       return Promise.reject(
-        new Error('Invalid audio format. Only MP3 files are accepted for analysis.'),
+        new Error('Invalid audio format. Provide M4A, MP3, WAV, AAC, or FLAC files.'),
       );
     }
 
@@ -59,12 +59,18 @@ export const api = {
       return Promise.reject(new Error('Caller number is required for analysis.'));
     }
 
-    const fileName = /[^/\\]+\.mp3$/i.exec(fileUri)?.[0] || `truvoice_chunk_${Date.now()}.mp3`;
+    let mimeType = 'audio/m4a';
+    if (/\.mp3($|\?)/i.test(fileUri)) mimeType = 'audio/mpeg';
+    else if (/\.wav($|\?)/i.test(fileUri)) mimeType = 'audio/wav';
+    else if (/\.flac($|\?)/i.test(fileUri)) mimeType = 'audio/flac';
+
+    const ext = mimeType.split('/')[1] || 'm4a';
+    const fileName = /[^/\\]+\.(m4a|mp3|wav|aac|flac)$/i.exec(fileUri)?.[0] || `truvoice_chunk_${Date.now()}.${ext}`;
 
     const formData = new FormData();
     formData.append('file', {
       uri: fileUri,
-      type: 'audio/mpeg',
+      type: mimeType,
       name: fileName,
     });
     formData.append('caller_number', String(callerNumber).trim());

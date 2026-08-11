@@ -1,6 +1,14 @@
 import { Audio } from 'expo-av';
 import * as FileSystem from 'expo-file-system/legacy';
-import { convertToMp3, deleteAudioFile } from './mp3Converter';
+
+export async function deleteAudioFile(uri) {
+  if (!uri) return;
+  try {
+    await FileSystem.deleteAsync(uri, { idempotent: true });
+  } catch {
+    // ignore cleanup errors
+  }
+}
 
 class AudioChunkerService {
   constructor() {
@@ -167,7 +175,6 @@ class AudioChunkerService {
 
   async _processAndEmitChunk(recordingInstance, index) {
     let sourceUri = null;
-    let mp3Uri = null;
 
     try {
       const status = await recordingInstance.getStatusAsync();
@@ -178,27 +185,24 @@ class AudioChunkerService {
       sourceUri = recordingInstance.getURI();
       if (!sourceUri) return;
 
-      mp3Uri = await convertToMp3(sourceUri);
-
       this.onChunkCallback?.({
         chunkIndex: index,
-        mp3Uri,
-        mimeType: 'audio/mpeg',
-        fileName: `truvoice_chunk_${index}.mp3`,
+        mp3Uri: sourceUri,
+        audioUri: sourceUri,
+        mimeType: 'audio/m4a',
+        fileName: `truvoice_chunk_${index}.m4a`,
         isMuted: false,
         isAnalysisStopped: false,
         timestamp: new Date().toISOString(),
         durationMs: this.intervalMs,
       });
     } catch (error) {
-      console.error(`Error processing MP3 chunk #${index}:`, error);
+      console.error(`Error processing audio chunk #${index}:`, error);
       this.onChunkCallback?.({
         chunkIndex: index,
         error: error.message,
         mp3Uri: null,
       });
-    } finally {
-      await deleteAudioFile(sourceUri);
     }
   }
 
