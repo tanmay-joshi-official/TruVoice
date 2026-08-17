@@ -25,10 +25,22 @@ class AgoraService {
     try {
       // Try loading native Agora RTC modules if available
       try {
-        const { createAgoraRtcEngine } = require('react-native-agora');
+        const { createAgoraRtcEngine, ChannelProfileType, ClientRoleType } = require('react-native-agora');
         this.rtcEngine = createAgoraRtcEngine();
         this.rtcEngine.initialize({ appId: this.appId });
+        if (typeof this.rtcEngine.setChannelProfile === 'function') {
+          this.rtcEngine.setChannelProfile(ChannelProfileType?.ChannelProfileCommunication ?? 0);
+        }
+        if (typeof this.rtcEngine.setClientRole === 'function') {
+          this.rtcEngine.setClientRole(ClientRoleType?.ClientRoleBroadcaster ?? 1);
+        }
         this.rtcEngine.enableAudio();
+        if (typeof this.rtcEngine.enableLocalAudio === 'function') {
+          this.rtcEngine.enableLocalAudio(true);
+        }
+        if (typeof this.rtcEngine.setDefaultAudioRouteToSpeakerphone === 'function') {
+          this.rtcEngine.setDefaultAudioRouteToSpeakerphone(true);
+        }
       } catch (e) {
         console.warn('Agora RTC Native module not loaded, using web/demo engine fallback.');
       }
@@ -178,7 +190,21 @@ class AgoraService {
     this.currentChannel = channelName;
     try {
       if (this.rtcEngine) {
-        await this.rtcEngine.joinChannel(token, channelName, uid || 0, {});
+        const mediaOptions = {
+          clientRoleType: 1, // ClientRoleBroadcaster
+          publishMicrophoneTrack: true,
+          autoSubscribeAudio: true,
+        };
+        await this.rtcEngine.joinChannel(token, channelName, uid || 0, mediaOptions);
+        if (typeof this.rtcEngine.enableAudio === 'function') {
+          await this.rtcEngine.enableAudio();
+        }
+        if (typeof this.rtcEngine.enableLocalAudio === 'function') {
+          await this.rtcEngine.enableLocalAudio(true);
+        }
+        if (typeof this.rtcEngine.muteLocalAudioStream === 'function') {
+          await this.rtcEngine.muteLocalAudioStream(false);
+        }
       }
       console.log(`Joined Agora RTC channel: ${channelName}`);
     } catch (e) {

@@ -36,7 +36,7 @@ export default function IncomingCallOverlay() {
       await agoraService.joinChannel(channelName, token, 0);
 
       // Send accept signaling message
-      await agoraService.respondToCallInvitation(callerUserId, 'accept', channelName);
+      await agoraService.respondToCallInvitation(callerUserId, 'accept', channelName, callId);
 
       // Update backend status to answered
       if (callId) {

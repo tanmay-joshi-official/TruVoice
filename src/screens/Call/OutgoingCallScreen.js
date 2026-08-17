@@ -74,7 +74,7 @@ export default function OutgoingCallScreen({ navigation, route }) {
           if (eventData.channelName === channelName) {
             clearTimeout(timeoutTimer);
 
-            if (eventData.action === 'accept') {
+            if (eventData.action === 'accept' || eventData.action === 'answered') {
               setCallStatusText('Connecting Audio...');
               try {
                 // Fetch Agora RTC Token
