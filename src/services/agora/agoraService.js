@@ -176,13 +176,36 @@ class AgoraService {
 
   async respondToCallInvitation(callerUserId, action, channelName, callId) {
     console.log(`Responding to call invitation: ${action}`);
-    if (callId) {
-      await api.updateCallStatus(callId, action);
+    const normalizedStatus = action === 'accept' ? 'answered' : action;
+
+    if (this.ws && this.ws.readyState === WebSocket.OPEN && callId) {
+      try {
+        this.ws.send(JSON.stringify({
+          type: 'update_call_status',
+          payload: {
+            call_id: callId,
+            status: normalizedStatus,
+            duration: 0,
+          },
+        }));
+      } catch (e) {
+        console.warn('Error sending WS update_call_status:', e);
+      }
     }
+
+    if (callId) {
+      try {
+        await api.updateCallStatus(callId, normalizedStatus);
+      } catch (e) {
+        console.warn('Error updating call status via HTTP API:', e);
+      }
+    }
+
     this.emit('call_response', {
       callerUserId,
-      action,
+      action: normalizedStatus,
       channelName,
+      callId,
     });
   }
 

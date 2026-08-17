@@ -70,13 +70,27 @@ export default function CallSummaryScreen({ navigation, route }) {
   ) || [];
 
   const transcriptLines = useMemo(() => {
+    let lines = [];
     if (Array.isArray(rawTranscript) && rawTranscript.length > 0) {
-      return rawTranscript;
+      lines = rawTranscript;
+    } else if (analysis?.transcriptLines?.length) {
+      lines = analysis.transcriptLines;
     }
-    if (analysis?.transcriptLines?.length) {
-      return analysis.transcriptLines;
-    }
-    return [];
+    const hallucinations = [
+      'thank you',
+      'thank you.',
+      'thank you!',
+      'thank you for watching',
+      'thank you for listening',
+      'subtitles by amara.org',
+      'subtitles by',
+      'amara.org',
+    ];
+    return lines.filter((line) => {
+      if (!line) return false;
+      const clean = String(line).toLowerCase().trim();
+      return !hallucinations.includes(clean) && clean.length > 1;
+    });
   }, [rawTranscript, analysis]);
 
   const hasAnalysis =

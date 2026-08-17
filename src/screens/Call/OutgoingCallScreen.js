@@ -71,7 +71,7 @@ export default function OutgoingCallScreen({ navigation, route }) {
         // 4. Listen for RTM response
         const handleResponse = async (eventData) => {
           if (!isMounted) return;
-          if (eventData.channelName === channelName) {
+          if (eventData.channelName === channelName || (callId && eventData.callId === callId)) {
             clearTimeout(timeoutTimer);
 
             if (eventData.action === 'accept' || eventData.action === 'answered') {

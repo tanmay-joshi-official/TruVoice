@@ -67,6 +67,22 @@ function PulseRing() {
   return <Animated.View style={[styles.pulseRing, animStyle]} />;
 }
 
+function isHallucinatedTranscript(text) {
+  if (!text) return true;
+  const cleaned = String(text).toLowerCase().trim().replace(/[.!?,]/g, '');
+  const hallucinations = [
+    'thank you',
+    'thank you for watching',
+    'thank you for listening',
+    'subtitles by amaraorg',
+    'subtitles by',
+    'amaraorg',
+    'like and subscribe',
+    'so',
+  ];
+  return hallucinations.includes(cleaned) || cleaned.length <= 1;
+}
+
 export default function ActiveCallScreen({ navigation, route }) {
   const insets = useSafeAreaInsets();
   const contact = route.params?.contact || {
@@ -139,7 +155,7 @@ export default function ActiveCallScreen({ navigation, route }) {
         aiStore.updateFromBackend(result);
         lastAnalysisRef.current = result;
 
-        if (result.transcript) {
+        if (result.transcript && !isHallucinatedTranscript(result.transcript)) {
           transcriptLinesRef.current = [
             ...transcriptLinesRef.current,
             result.transcript,
