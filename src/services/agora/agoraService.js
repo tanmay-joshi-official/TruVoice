@@ -95,11 +95,13 @@ class AgoraService {
               callerName: msg.callerName || 'Incoming Caller',
             });
           } else if (msg.type === 'call_response') {
-            this.emit('call_response', {
-              callId: msg.callId,
+            const respPayload = {
+              callId: String(msg.callId),
               action: msg.action,
               channelName: msg.channelName,
-            });
+            };
+            this.lastCallResponse = respPayload;
+            this.emit('call_response', respPayload);
           }
         } catch (e) {
           console.warn('Error parsing signaling message:', e);

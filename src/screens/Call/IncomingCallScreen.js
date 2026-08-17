@@ -21,6 +21,11 @@ import Animated, {
 import { ROUTES } from '../../constants/routes';
 import { colors } from '../../theme';
 
+import { Audio } from 'expo-av';
+import { agoraService } from '../../services/agora/agoraService';
+import { api } from '../../services/api/client';
+import { useCallStore } from '../../store/callStore';
+
 function IncomingWaveBar({ delay, heightMult = 1 }) {
   const height = useSharedValue(6);
 
@@ -50,13 +55,56 @@ export default function IncomingCallScreen({ navigation, route }) {
     initials: 'EV',
     colors: ['#EC4899', '#F97316'],
   };
+  const callId = route.params?.callId || useCallStore.getState().callId;
+  const channelName = route.params?.channelName || useCallStore.getState().channelName;
+  const callerUserId = route.params?.callerUserId || contact.userId;
 
-  const handleDecline = () => {
+  const handleDecline = async () => {
+    try {
+      if (callerUserId && channelName) {
+        await agoraService.respondToCallInvitation(callerUserId, 'decline', channelName, callId);
+      }
+      if (callId) {
+        api.updateCallStatus(callId, 'declined');
+      }
+    } catch (e) {
+      console.warn('Error declining call:', e);
+    }
     navigation.goBack();
   };
 
-  const handleAccept = () => {
-    navigation.replace(ROUTES.ACTIVE_CALL, { contact });
+  const handleAccept = async () => {
+    try {
+      try {
+        await Audio.setAudioModeAsync({
+          allowsRecordingIOS: true,
+          playsInSilentModeIOS: true,
+          staysActiveInBackground: true,
+          shouldDuckAndroid: true,
+          playThroughEarpieceAndroid: false,
+        });
+      } catch (e) {
+        console.warn('Error setting audio mode:', e);
+      }
+
+      if (channelName) {
+        const tokenRes = await api.getAgoraToken(channelName);
+        const token = tokenRes.data?.token;
+        await agoraService.joinChannel(channelName, token, 0);
+      }
+
+      if (callerUserId && channelName) {
+        await agoraService.respondToCallInvitation(callerUserId, 'accept', channelName, callId);
+      }
+
+      if (callId) {
+        await api.updateCallStatus(callId, 'answered');
+      }
+    } catch (err) {
+      console.warn('Error in IncomingCallScreen handleAccept:', err);
+    }
+
+    navigation.replace(ROUTES.ACTIVE_CALL, { contact, callId, channelName });
   };
 
   const barMultipliers = [0.4, 0.8, 1.2, 0.6, 1.5, 0.9, 1.8, 1.0, 1.4, 0.7, 1.1, 0.5];

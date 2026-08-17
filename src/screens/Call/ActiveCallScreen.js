@@ -135,6 +135,37 @@ export default function ActiveCallScreen({ navigation, route }) {
     aiStore.reset();
     transcriptLinesRef.current = [];
     lastAnalysisRef.current = null;
+
+    const channelNameParam = route.params?.channelName || useCallStore.getState().channelName;
+    if (channelNameParam && agoraService.currentChannel !== channelNameParam) {
+      (async () => {
+        try {
+          const tokenRes = await api.getAgoraToken(channelNameParam);
+          await agoraService.joinChannel(channelNameParam, tokenRes.data?.token, 0);
+        } catch (e) {
+          console.warn('ActiveCallScreen channel join warning:', e);
+        }
+      })();
+    }
+
+    const handleCallEndedSignal = (data) => {
+      if (['ended', 'declined', 'canceled', 'busy'].includes(data.action)) {
+        audioProcessorService.stop();
+        agoraService.leaveChannel().catch(() => {});
+        navigation.replace(ROUTES.CALL_SUMMARY, {
+          contact,
+          isSavedContact,
+          duration: `${Math.floor(seconds / 60)}m ${seconds % 60}s`,
+          transcript: transcriptLinesRef.current,
+          lastAnalysis: lastAnalysisRef.current,
+        });
+      }
+    };
+
+    agoraService.on('call_response', handleCallEndedSignal);
+    return () => {
+      agoraService.off('call_response', handleCallEndedSignal);
+    };
   }, []);
 
   useEffect(() => {

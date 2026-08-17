@@ -9,6 +9,7 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
+import { Audio } from 'expo-av';
 import { useCallStore } from '../store/callStore';
 import { agoraService } from '../services/agora/agoraService';
 import { api } from '../services/api/client';
@@ -27,6 +28,19 @@ export default function IncomingCallOverlay() {
     try {
       const { channelName, callId, callerName, callerUserId } = incomingCall;
       setCallId(callId);
+
+      // Enable microphone and audio recording mode
+      try {
+        await Audio.setAudioModeAsync({
+          allowsRecordingIOS: true,
+          playsInSilentModeIOS: true,
+          staysActiveInBackground: true,
+          shouldDuckAndroid: true,
+          playThroughEarpieceAndroid: false,
+        });
+      } catch (e) {
+        console.warn('Error setting audio mode on accept:', e);
+      }
 
       // Fetch Agora RTC token for channel
       const tokenRes = await api.getAgoraToken(channelName);
