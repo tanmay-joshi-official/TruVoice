@@ -102,10 +102,11 @@ export default function OutgoingCallScreen({ navigation, route }) {
 
         if (isMounted) setCallStatusText('Ringing...');
 
-        // 5. Poll backend for call status (fallback in case WebSocket packet is delayed)
+        // 5. Poll backend for call status (fallback ONLY if WebSocket is disconnected)
         if (loggedCallId) {
           pollInterval = setInterval(async () => {
             if (hasNavigatedRef.current) return;
+            if (agoraService.ws && agoraService.ws.readyState === WebSocket.OPEN) return;
             try {
               const callDetail = await api.getVoiceCallDetail(loggedCallId);
               if (callDetail.data?.status === 'answered') {
@@ -120,7 +121,7 @@ export default function OutgoingCallScreen({ navigation, route }) {
             } catch (e) {
               // Silent poller catch
             }
-          }, 1500);
+          }, 5000);
         }
 
         // 6. Setup 30-second no answer timeout

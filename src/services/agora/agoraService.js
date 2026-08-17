@@ -131,6 +131,9 @@ class AgoraService {
     this.pollerInterval = setInterval(async () => {
       try {
         if (!this.isLoggedIn) return;
+        // Skip polling if WebSocket signaling is connected and healthy
+        if (this.ws && this.ws.readyState === WebSocket.OPEN) return;
+
         const state = useCallStore.getState();
         if (state.incomingCall || state.status === 'active') return;
 
