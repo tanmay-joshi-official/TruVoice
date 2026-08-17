@@ -1,6 +1,6 @@
 import { Platform } from 'react-native';
 import Constants from 'expo-constants';
-
+// this is config 
 const appConfigApiUrl =
   Constants.expoConfig?.extra?.apiUrl ||
   Constants.manifest?.extra?.apiUrl;
@@ -43,6 +43,7 @@ export const ENDPOINTS = {
   resendOtp: '/auth/resend-otp',
   logout: '/auth/logout',
   analyze: '/api/v1/analyze',
+  analysisAudioBase64: '/api/v1/analysis/audio',
   analysisHistory: '/api/v1/analysis-history',
   spamStatus: (phone) =>
     `/api/v1/spam-status/${encodeURIComponent(phone)}`,

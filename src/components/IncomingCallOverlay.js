@@ -40,7 +40,7 @@ export default function IncomingCallOverlay() {
 
       // Update backend status to answered
       if (callId) {
-        api.updateCallStatus(callId, 'answered');
+        await api.updateCallStatus(callId, 'answered');
       }
 
       clearIncomingCall();

@@ -84,7 +84,7 @@ export default function OutgoingCallScreen({ navigation, route }) {
                 // Join Agora Audio Channel
                 await agoraService.joinChannel(channelName, token, 0);
 
-                if (callId) api.updateCallStatus(callId, 'answered');
+                if (callId) await api.updateCallStatus(callId, 'answered');
 
                 navigation.replace(ROUTES.ACTIVE_CALL, {
                   contact,

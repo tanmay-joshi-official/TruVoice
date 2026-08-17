@@ -81,6 +81,21 @@ export const api = {
     });
   },
 
+  analyzeAudioBase64: (audioBase64, callerNumber, callId) => {
+    if (!audioBase64) {
+      return Promise.reject(new Error('Audio base64 data is missing.'));
+    }
+    return apiClient.post(
+      ENDPOINTS.analysisAudioBase64,
+      {
+        audio_base64: audioBase64,
+        caller_number: callerNumber ? String(callerNumber).trim() : null,
+        call_id: callId || null,
+      },
+      { timeout: 120000 },
+    );
+  },
+
   getAnalysisHistory: () => apiClient.get(ENDPOINTS.analysisHistory),
 
   getSpamStatus: (phoneNumber) =>

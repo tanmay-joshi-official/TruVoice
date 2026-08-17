@@ -219,6 +219,45 @@ class AgoraService {
     }
   }
 
+  getEngine() {
+    return this.rtcEngine;
+  }
+
+  getMediaEngine() {
+    if (this.rtcEngine && typeof this.rtcEngine.getMediaEngine === 'function') {
+      try {
+        return this.rtcEngine.getMediaEngine();
+      } catch (e) {
+        console.warn('Failed to get MediaEngine:', e);
+      }
+    }
+    return null;
+  }
+
+  registerAudioFrameObserver(observer) {
+    try {
+      const mediaEngine = this.getMediaEngine();
+      if (mediaEngine && typeof mediaEngine.registerAudioFrameObserver === 'function') {
+        return mediaEngine.registerAudioFrameObserver(observer);
+      }
+    } catch (e) {
+      console.warn('Error registering audio frame observer on Agora MediaEngine:', e);
+    }
+    return null;
+  }
+
+  unregisterAudioFrameObserver(observer) {
+    try {
+      const mediaEngine = this.getMediaEngine();
+      if (mediaEngine && typeof mediaEngine.unregisterAudioFrameObserver === 'function') {
+        return mediaEngine.unregisterAudioFrameObserver(observer);
+      }
+    } catch (e) {
+      console.warn('Error unregistering audio frame observer on Agora MediaEngine:', e);
+    }
+    return null;
+  }
+
   cleanup() {
     if (this.pollerInterval) clearInterval(this.pollerInterval);
     if (this.pingInterval) clearInterval(this.pingInterval);

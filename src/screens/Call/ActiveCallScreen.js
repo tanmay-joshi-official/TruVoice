@@ -24,7 +24,7 @@ import Animated, {
 } from 'react-native-reanimated';
 import { ROUTES } from '../../constants/routes';
 import { colors } from '../../theme';
-import { audioChunker } from '../../services/audio/audioChunker';
+import { audioProcessorService } from '../../services/audio/audioProcessorService';
 import { analysisService } from '../../services/analysis/analysisService';
 import { useAiDetectionStore } from '../../store/aiDetectionStore';
 import { useHistoryStore } from '../../store/historyStore';
@@ -128,70 +128,48 @@ export default function ActiveCallScreen({ navigation, route }) {
     return () => clearInterval(timer);
   }, []);
 
-  const analyzeChunk = useCallback(
-    async (mp3Uri) => {
-      if (!mp3Uri || !callerNumber) return;
-      setIsAnalyzing(true);
-      setAnalysisError('');
-      try {
-        const result = await analysisService.analyzeChunk(mp3Uri, callerNumber);
+  useEffect(() => {
+    if (!shouldAnalyze) return;
+
+    audioProcessorService.start(
+      activeCallId,
+      callerNumber,
+      (result) => {
+        setChunkCount((prev) => prev + 1);
         aiStore.updateFromBackend(result);
         lastAnalysisRef.current = result;
 
-        if (result.transcriptLines && result.transcriptLines.length > 0) {
+        if (result.transcript) {
           transcriptLinesRef.current = [
             ...transcriptLinesRef.current,
-            ...result.transcriptLines,
+            result.transcript,
           ].slice(-60);
         }
 
         prependHistoryItem(result);
-      } catch (err) {
-        setAnalysisError(err.message || 'Analysis failed');
-      } finally {
-        setIsAnalyzing(false);
-      }
-    },
-    [callerNumber, aiStore, prependHistoryItem],
-  );
-
-  useEffect(() => {
-    if (!shouldAnalyze) return;
-
-    audioChunker.startChunking(async (chunkData) => {
-      setChunkCount((prev) => prev + 1);
-
-      if (chunkData.isMuted || chunkData.isAnalysisStopped || !chunkData.mp3Uri) {
-        return;
-      }
-
-      await analyzeChunk(chunkData.mp3Uri);
-    }, 20000);
+      },
+      20000,
+    );
 
     return () => {
-      audioChunker.stopChunking();
+      audioProcessorService.stop();
     };
-  }, [shouldAnalyze, analyzeChunk]);
+  }, [shouldAnalyze, activeCallId, callerNumber, aiStore, prependHistoryItem]);
 
   const handleToggleMute = useCallback(() => {
     const next = !isMuted;
     setIsMuted(next);
-    audioChunker.setMuted(next);
+    agoraService.setMuted(next);
+    audioProcessorService.setMuted(next);
   }, [isMuted]);
 
   const handleToggleSpeaker = async () => {
     try {
       const next = !isSpeaker;
       setIsSpeaker(next);
-      await Audio.setAudioModeAsync({
-        allowsRecordingIOS: true,
-        playsInSilentModeIOS: true,
-        staysActiveInBackground: true,
-        shouldDuckAndroid: true,
-        playThroughEarpieceAndroid: !next,
-      });
+      await agoraService.setSpeaker(next);
     } catch (e) {
-      console.warn('Error setting audio mode:', e);
+      console.warn('Error setting speaker state:', e);
     }
   };
 
@@ -207,7 +185,7 @@ export default function ActiveCallScreen({ navigation, route }) {
           onPress: () => {
             setAnalysisStopped(true);
             setShowAnalysisCard(false);
-            audioChunker.setAnalysisStopped(true);
+            audioProcessorService.setStopped(true);
           },
         },
       ],
@@ -216,11 +194,11 @@ export default function ActiveCallScreen({ navigation, route }) {
 
   const handleResumeAnalysis = useCallback(() => {
     setAnalysisStopped(false);
-    audioChunker.setAnalysisStopped(false);
+    audioProcessorService.setStopped(false);
   }, []);
 
   const handleEndCall = async () => {
-    audioChunker.stopChunking();
+    audioProcessorService.stop();
     try {
       await agoraService.leaveChannel();
       if (activeCallId) {

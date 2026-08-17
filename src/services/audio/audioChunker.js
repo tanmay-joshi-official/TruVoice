@@ -70,38 +70,15 @@ class AudioChunkerService {
   }
 
   async startChunking(onChunkCallback, intervalMs = 20000) {
-    if (this.isChunking) return true;
-
-    const hasPermission = await this.requestPermissions();
-    if (!hasPermission) {
-      throw new Error('Microphone permission is required for voice analysis.');
-    }
-
-    this.onChunkCallback = onChunkCallback;
-    this.intervalMs = intervalMs;
-    this.chunkIndex = 0;
-    this.isChunking = true;
-    this.isMuted = false;
-    this.isAnalysisStopped = false;
-
-    await Audio.setAudioModeAsync({
-      allowsRecordingIOS: true,
-      playsInSilentModeIOS: true,
-      staysActiveInBackground: true,
-      shouldDuckAndroid: true,
-      playThroughEarpieceAndroid: false,
-    });
-
-    await this._startRecordingChunk();
-    this._scheduleNextCycle();
-    return true;
+    console.warn('Legacy audioChunker startChunking called. Hardware mic recording disabled in favor of Agora audioProcessorService.');
+    this.isChunking = false;
+    return false;
   }
 
   async _startRecordingChunk() {
-    if (!this.isChunking || this.isMuted || this.isAnalysisStopped) {
-      this.recording = null;
-      return;
-    }
+    this.recording = null;
+    return;
+  }
 
     const { recording } = await Audio.Recording.createAsync({
       android: {
