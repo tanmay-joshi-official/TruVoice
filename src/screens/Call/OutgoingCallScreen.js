@@ -35,6 +35,7 @@ export default function OutgoingCallScreen({ navigation, route }) {
   const [dtmfText, setDtmfText] = useState('');
   const [callStatusText, setCallStatusText] = useState('Calling User...');
 
+  const callId = useCallStore((s) => s.callId);
   const setCallId = useCallStore((s) => s.setCallId);
   const setChannelName = useCallStore((s) => s.setChannelName);
 
@@ -51,11 +52,11 @@ export default function OutgoingCallScreen({ navigation, route }) {
 
         // 1. Log call to backend database
         const logRes = await api.logCall(channelName, targetUserId);
-        const callId = logRes.data?.call_id;
-        if (callId) setCallId(callId);
+        const loggedCallId = logRes.data?.call_id;
+        if (loggedCallId) setCallId(loggedCallId);
 
         // 2. Dispatch RTM call invite to target user
-        await agoraService.sendCallInvitation(targetUserId, channelName, callId, 'Caller');
+        await agoraService.sendCallInvitation(targetUserId, channelName, loggedCallId, 'Caller');
 
         if (isMounted) setCallStatusText('Ringing...');
 
@@ -63,55 +64,13 @@ export default function OutgoingCallScreen({ navigation, route }) {
         timeoutTimer = setTimeout(() => {
           if (isMounted) {
             setCallStatusText('No Answer');
-            if (callId) api.updateCallStatus(callId, 'canceled');
+            if (loggedCallId) api.updateCallStatus(loggedCallId, 'canceled');
             setTimeout(() => navigation.goBack(), 1500);
           }
         }, 30000);
 
-        // 4. Listen for RTM response
-        const handleResponse = async (eventData) => {
-          if (!isMounted) return;
-          if (eventData.channelName === channelName || (callId && eventData.callId === callId)) {
-            clearTimeout(timeoutTimer);
-
-            if (eventData.action === 'accept' || eventData.action === 'answered') {
-              setCallStatusText('Connecting Audio...');
-              try {
-                // Fetch Agora RTC Token
-                const tokenRes = await api.getAgoraToken(channelName);
-                const token = tokenRes.data?.token;
-
-                // Join Agora Audio Channel
-                await agoraService.joinChannel(channelName, token, 0);
-
-                if (callId) await api.updateCallStatus(callId, 'answered');
-
-                navigation.replace(ROUTES.ACTIVE_CALL, {
-                  contact,
-                  callId,
-                  channelName,
-                });
-              } catch (e) {
-                console.warn('Error joining RTC channel:', e);
-                navigation.goBack();
-              }
-            } else if (eventData.action === 'decline') {
-              setCallStatusText('Call Declined');
-              if (callId) api.updateCallStatus(callId, 'declined');
-              setTimeout(() => navigation.goBack(), 1500);
-            } else if (eventData.action === 'busy') {
-              setCallStatusText('User is Busy');
-              if (callId) api.updateCallStatus(callId, 'busy');
-              setTimeout(() => navigation.goBack(), 1500);
-            }
-          }
-        };
-
-        agoraService.on('call_response', handleResponse);
-
-        return () => {
-          agoraService.off('call_response', handleResponse);
-        };
+        // Event listener is now handled in the other useEffect
+        // The timeout is the primary mechanism for this effect
       } catch (err) {
         console.warn('Outgoing Agora call error:', err);
         if (isMounted) {
@@ -121,7 +80,6 @@ export default function OutgoingCallScreen({ navigation, route }) {
           }, 2000);
         }
       }
-
     }
 
     initiateAgoraCall();
@@ -132,7 +90,22 @@ export default function OutgoingCallScreen({ navigation, route }) {
     };
   }, [navigation, contact, setCallId, setChannelName]);
 
+  useEffect(() => {
+    const handleCallResponse = (data) => {
+      if (data.action === 'answered' && data.callId === callId) {
+        navigation.replace(ROUTES.ACTIVE_CALL, {
+          contact,
+          callId,
+          channelName: data.channelName,
+        });
+      }
+    };
 
+    agoraService.on('call_response', handleCallResponse);
+    return () => {
+      agoraService.off('call_response', handleCallResponse);
+    };
+  }, [callId, navigation, contact]);
 
   const handleToggleSpeaker = async () => {
     try {
@@ -184,7 +157,7 @@ export default function OutgoingCallScreen({ navigation, route }) {
           </View>
 
           <Text style={styles.callerName}>{contact.name}</Text>
-          <Text style={styles.callStatus}>Calling...</Text>
+          <Text style={styles.callStatus}>{callStatusText}</Text>
 
           <Text style={styles.timerText}>00:00</Text>
         </View>

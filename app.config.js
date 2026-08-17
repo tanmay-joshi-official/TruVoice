@@ -7,7 +7,7 @@ function loadEnvFile(filePath) {
   if (!fs.existsSync(filePath)) return env;
 
   const content = fs.readFileSync(filePath, "utf8");
-
+  
   content.split(/\r?\n/).forEach((line) => {
     const match = line.match(
       /^\s*([A-Za-z_][A-Za-z0-9_]*)\s*=\s*(.*)?\s*$/
