@@ -104,6 +104,7 @@ export default function ActiveCallScreen({ navigation, route }) {
 
   const transcriptLinesRef = useRef([]);
   const lastAnalysisRef = useRef(null);
+  const hasEndedRef = useRef(false);
 
   const activeCallId = route.params?.callId || useCallStore((s) => s.callId);
   useVoiceAnalysis(activeCallId);
@@ -117,6 +118,7 @@ export default function ActiveCallScreen({ navigation, route }) {
 
   const storeContacts = useContactsStore((s) => s.contacts);
   const aiStore = useAiDetectionStore();
+  const updateAiStore = useAiDetectionStore((s) => s.updateFromBackend);
   const prependHistoryItem = useHistoryStore((s) => s.prependItem);
 
   const { authenticityScore, aiProbability, confidence, riskLevelLabel, scamCategory, scamIntentScore, unifiedRiskScore } = aiStore;
@@ -158,7 +160,9 @@ export default function ActiveCallScreen({ navigation, route }) {
     }
 
     const handleCallEndedSignal = (data) => {
-      if (['ended', 'declined', 'canceled', 'busy'].includes(data.action)) {
+      const isThisCall = !data.callId || String(data.callId) === String(activeCallId);
+      if (isThisCall && !hasEndedRef.current && ['ended', 'declined', 'canceled', 'busy'].includes(data.action)) {
+        hasEndedRef.current = true;
         audioProcessorService.stop();
         agoraService.leaveChannel().catch(() => {});
         navigation.replace(ROUTES.CALL_SUMMARY, {
@@ -192,7 +196,7 @@ export default function ActiveCallScreen({ navigation, route }) {
       callerNumber,
       (result) => {
         setChunkCount((prev) => prev + 1);
-        aiStore.updateFromBackend(result);
+        updateAiStore(result);
         lastAnalysisRef.current = result;
 
         if (result.transcript && !isHallucinatedTranscript(result.transcript)) {
@@ -210,7 +214,7 @@ export default function ActiveCallScreen({ navigation, route }) {
     return () => {
       audioProcessorService.stop();
     };
-  }, [shouldAnalyze, activeCallId, callerNumber, aiStore, prependHistoryItem]);
+  }, [shouldAnalyze, activeCallId, callerNumber, updateAiStore, prependHistoryItem]);
 
   const handleToggleMute = useCallback(() => {
     const next = !isMuted;
@@ -254,12 +258,16 @@ export default function ActiveCallScreen({ navigation, route }) {
   }, []);
 
   const handleEndCall = async () => {
+    if (hasEndedRef.current) return;
+    hasEndedRef.current = true;
     audioProcessorService.stop();
     try {
-      await agoraService.leaveChannel();
       if (activeCallId) {
-        api.updateCallStatus(activeCallId, 'ended', seconds);
+        // Signal first, so the other participant receives the hangup before
+        // this device tears down the call and navigates away.
+        await api.updateCallStatus(activeCallId, 'ended', seconds);
       }
+      await agoraService.leaveChannel();
     } catch (e) {
       console.warn('Error ending Agora call:', e);
     }

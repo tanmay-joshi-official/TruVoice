@@ -50,6 +50,15 @@ class AgoraService {
       onUserJoined: (connection, remoteUid, elapsed) => {
         console.log(`Agora: remote user ${remoteUid} joined (${elapsed}ms)`);
         this.remoteUsers.add(remoteUid);
+        // Explicitly subscribe to the peer's audio. This is necessary on
+        // devices where an earlier call left a per-user mute state behind.
+        try {
+          if (typeof this.rtcEngine?.muteRemoteAudioStream === 'function') {
+            this.rtcEngine.muteRemoteAudioStream(remoteUid, false);
+          }
+        } catch (e) {
+          console.warn(`Agora: unable to unmute remote audio ${remoteUid}`, e);
+        }
         useCallStore.getState().setConnectionState('connected');
         this.emit('remote_user_joined', { uid: remoteUid, channelName: connection?.channelId });
       },
@@ -328,6 +337,7 @@ class AgoraService {
         clientRoleType: 1,
         publishMicrophoneTrack: true,
         autoSubscribeAudio: true,
+        enableAudioRecordingOrPlayout: true,
       };
 
       const resolvedUid = Number.isInteger(uid) && uid !== 0 ? uid : this._computeUid();
