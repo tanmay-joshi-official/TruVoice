@@ -57,5 +57,10 @@ module.exports = ({ config }) => ({
       env.API_URL ||
       env.NEXT_PUBLIC_API_URL ||
       "http://localhost:8000",
+
+    agoraAppId:
+      env.EXPO_PUBLIC_AGORA_APP_ID ||
+      env.AGORA_APP_ID ||
+      "",
   },
 });

@@ -29,7 +29,12 @@ export default function IncomingCallOverlay() {
       const { channelName, callId, callerName, callerUserId } = incomingCall;
       setCallId(callId);
 
-      // Enable microphone and audio recording mode
+      const micGranted = await agoraService.requestMicrophonePermission();
+      if (!micGranted) {
+        console.warn('Microphone permission denied — cannot accept call');
+        return;
+      }
+
       try {
         await Audio.setAudioModeAsync({
           allowsRecordingIOS: true,
@@ -42,20 +47,12 @@ export default function IncomingCallOverlay() {
         console.warn('Error setting audio mode on accept:', e);
       }
 
-      // Fetch Agora RTC token for channel
       const tokenRes = await api.getAgoraToken(channelName);
       const token = tokenRes.data?.token;
 
-      // Join Agora audio channel
       await agoraService.joinChannel(channelName, token, 0);
 
-      // Send accept signaling message
       await agoraService.respondToCallInvitation(callerUserId, 'accept', channelName, callId);
-
-      // Update backend status to answered
-      if (callId) {
-        await api.updateCallStatus(callId, 'answered');
-      }
 
       clearIncomingCall();
 
@@ -79,10 +76,7 @@ export default function IncomingCallOverlay() {
   const handleDecline = async () => {
     try {
       const { channelName, callerUserId, callId } = incomingCall;
-      await agoraService.respondToCallInvitation(callerUserId, 'decline', channelName);
-      if (callId) {
-        api.updateCallStatus(callId, 'declined');
-      }
+      await agoraService.respondToCallInvitation(callerUserId, 'decline', channelName, callId);
     } catch (err) {
       console.warn('Error declining call:', err);
     } finally {

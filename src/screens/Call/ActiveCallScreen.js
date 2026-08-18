@@ -135,11 +135,20 @@ export default function ActiveCallScreen({ navigation, route }) {
     aiStore.reset();
     transcriptLinesRef.current = [];
     lastAnalysisRef.current = null;
+    useCallStore.getState().setStatus('active');
 
     const channelNameParam = route.params?.channelName || useCallStore.getState().channelName;
     if (channelNameParam && agoraService.currentChannel !== channelNameParam) {
       (async () => {
         try {
+          await agoraService.requestMicrophonePermission();
+          await Audio.setAudioModeAsync({
+            allowsRecordingIOS: true,
+            playsInSilentModeIOS: true,
+            staysActiveInBackground: true,
+            shouldDuckAndroid: true,
+            playThroughEarpieceAndroid: false,
+          });
           const tokenRes = await api.getAgoraToken(channelNameParam);
           await agoraService.joinChannel(channelNameParam, tokenRes.data?.token, 0);
         } catch (e) {
@@ -311,6 +320,7 @@ export default function ActiveCallScreen({ navigation, route }) {
           <Text style={styles.callerName}>{contact.name}</Text>
           <Text style={styles.callerSub}>
             {contact.number || 'In-app call'} · {formatTimer(seconds)}
+            {connectionState === 'connected' ? ' · Connected' : connectionState === 'connecting' ? ' · Connecting...' : ''}
           </Text>
 
           {isSavedContact && (

@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useRef, useCallback } from 'react';
 import {
   View,
   Text,
@@ -33,41 +33,54 @@ export default function OutgoingCallScreen({ navigation, route }) {
   const [isSpeaker, setIsSpeaker] = useState(false);
   const [showKeypad, setShowKeypad] = useState(false);
   const [dtmfText, setDtmfText] = useState('');
-  const [callStatusText, setCallStatusText] = useState('Calling User...');
+  const [callStatusText, setCallStatusText] = useState('Calling...');
 
-  const callId = useCallStore((s) => s.callId);
   const setCallId = useCallStore((s) => s.setCallId);
   const setChannelName = useCallStore((s) => s.setChannelName);
+  const setStatus = useCallStore((s) => s.setStatus);
 
-  const activeCallIdRef = React.useRef(null);
-  const hasNavigatedRef = React.useRef(false);
+  const activeCallIdRef = useRef(null);
+  const activeChannelRef = useRef(null);
+  const hasNavigatedRef = useRef(false);
+  const callInitiatedRef = useRef(false);
+
+  const navigateToActiveCall = useCallback((targetCallId, channelName) => {
+    if (hasNavigatedRef.current) return;
+    hasNavigatedRef.current = true;
+    setStatus('active');
+
+    navigation.replace(ROUTES.ACTIVE_CALL, {
+      contact,
+      callId: targetCallId,
+      channelName,
+    });
+  }, [navigation, contact, setStatus]);
 
   useEffect(() => {
+    if (callInitiatedRef.current) return;
+    callInitiatedRef.current = true;
+
     let isMounted = true;
     let timeoutTimer = null;
     let pollInterval = null;
-
-    const navigateToActiveCall = (targetCallId, channelName) => {
-      if (hasNavigatedRef.current) return;
-      hasNavigatedRef.current = true;
-      if (pollInterval) clearInterval(pollInterval);
-      if (timeoutTimer) clearTimeout(timeoutTimer);
-
-      navigation.replace(ROUTES.ACTIVE_CALL, {
-        contact,
-        callId: targetCallId,
-        channelName,
-      });
-    };
 
     async function initiateAgoraCall() {
       try {
         const targetUserId = contact.userId || contact.number || 'target-user-id';
         const channelName = `truvoice_${Date.now()}_${Math.floor(Math.random() * 1000)}`;
-
+        activeChannelRef.current = channelName;
         setChannelName(channelName);
+        setStatus('outgoing');
 
-        // 1. Enable microphone and audio recording mode
+        const micGranted = await agoraService.requestMicrophonePermission();
+        if (!micGranted) {
+          if (isMounted) {
+            setCallStatusText('Microphone permission required');
+            setTimeout(() => navigation.goBack(), 2000);
+          }
+          return;
+        }
+
         try {
           await Audio.setAudioModeAsync({
             allowsRecordingIOS: true,
@@ -80,7 +93,6 @@ export default function OutgoingCallScreen({ navigation, route }) {
           console.warn('Error enabling audio mode for outgoing call:', e);
         }
 
-        // 2. Log call to backend database
         const logRes = await api.logCall(channelName, targetUserId);
         const loggedCallId = logRes.data?.call_id;
         if (loggedCallId) {
@@ -88,7 +100,6 @@ export default function OutgoingCallScreen({ navigation, route }) {
           activeCallIdRef.current = String(loggedCallId);
         }
 
-        // 3. Fetch Agora RTC token & join RTC channel as caller
         try {
           const tokenRes = await api.getAgoraToken(channelName);
           const token = tokenRes.data?.token;
@@ -97,16 +108,11 @@ export default function OutgoingCallScreen({ navigation, route }) {
           console.warn('Error joining Agora channel on outgoing call:', tokErr);
         }
 
-        // 4. Dispatch call invite to target user
-        await agoraService.sendCallInvitation(targetUserId, channelName, loggedCallId, 'Caller');
-
         if (isMounted) setCallStatusText('Ringing...');
 
-        // 5. Poll backend for call status (fallback ONLY if WebSocket is disconnected)
         if (loggedCallId) {
           pollInterval = setInterval(async () => {
             if (hasNavigatedRef.current) return;
-            if (agoraService.ws && agoraService.ws.readyState === WebSocket.OPEN) return;
             try {
               const callDetail = await api.getVoiceCallDetail(loggedCallId);
               if (callDetail.data?.status === 'answered') {
@@ -121,10 +127,9 @@ export default function OutgoingCallScreen({ navigation, route }) {
             } catch (e) {
               // Silent poller catch
             }
-          }, 5000);
+          }, 2000);
         }
 
-        // 6. Setup 30-second no answer timeout
         timeoutTimer = setTimeout(() => {
           if (isMounted && !hasNavigatedRef.current) {
             setCallStatusText('No Answer');
@@ -132,7 +137,7 @@ export default function OutgoingCallScreen({ navigation, route }) {
             if (loggedCallId) api.updateCallStatus(loggedCallId, 'canceled');
             setTimeout(() => navigation.goBack(), 1500);
           }
-        }, 30000);
+        }, 45000);
 
       } catch (err) {
         console.warn('Outgoing Agora call error:', err);
@@ -146,21 +151,41 @@ export default function OutgoingCallScreen({ navigation, route }) {
     }
 
     const handleCallResponse = (data) => {
-      const currentCallId = activeCallIdRef.current || String(callId);
-      if (
+      if (hasNavigatedRef.current) return;
+
+      const currentCallId = activeCallIdRef.current;
+      const matchesCall =
         data.action === 'answered' &&
-        (!data.callId || String(data.callId) === String(currentCallId) || !currentCallId)
-      ) {
-        navigateToActiveCall(data.callId || currentCallId, data.channelName);
-      } else if (['declined', 'busy', 'ended'].includes(data.action)) {
-        if (isMounted) {
-          setCallStatusText('Call Declined');
-          setTimeout(() => navigation.goBack(), 1500);
+        (!data.callId || !currentCallId || String(data.callId) === String(currentCallId));
+
+      if (matchesCall) {
+        navigateToActiveCall(
+          data.callId || currentCallId,
+          data.channelName || activeChannelRef.current,
+        );
+      } else if (['declined', 'decline', 'busy', 'ended', 'canceled'].includes(data.action)) {
+        if (String(data.callId) === String(currentCallId) || !data.callId) {
+          if (isMounted) {
+            setCallStatusText(data.action === 'declined' || data.action === 'decline' ? 'Call Declined' : 'Call Ended');
+            setTimeout(() => navigation.goBack(), 1500);
+          }
+        }
+      }
+    };
+
+    const handleRemoteJoined = () => {
+      if (isMounted && !hasNavigatedRef.current) {
+        setCallStatusText('Connected');
+        const callId = activeCallIdRef.current;
+        const channel = activeChannelRef.current;
+        if (callId && channel) {
+          navigateToActiveCall(callId, channel);
         }
       }
     };
 
     agoraService.on('call_response', handleCallResponse);
+    agoraService.on('remote_user_joined', handleRemoteJoined);
     initiateAgoraCall();
 
     return () => {
@@ -168,26 +193,43 @@ export default function OutgoingCallScreen({ navigation, route }) {
       if (timeoutTimer) clearTimeout(timeoutTimer);
       if (pollInterval) clearInterval(pollInterval);
       agoraService.off('call_response', handleCallResponse);
+      agoraService.off('remote_user_joined', handleRemoteJoined);
     };
-  }, [navigation, contact, setCallId, setChannelName, callId]);
+  }, [navigation, contact, setCallId, setChannelName, setStatus, navigateToActiveCall]);
 
   const handleToggleSpeaker = async () => {
     try {
       const next = !isSpeaker;
       setIsSpeaker(next);
+      await agoraService.setSpeaker(next);
       await Audio.setAudioModeAsync({
         allowsRecordingIOS: true,
         playsInSilentModeIOS: true,
         staysActiveInBackground: true,
         shouldDuckAndroid: true,
-        playThroughEarpieceAndroid: !next, // true means earpiece, false means speakerphone
+        playThroughEarpieceAndroid: !next,
       });
     } catch (e) {
       console.warn('Error setting audio mode:', e);
     }
   };
 
-  const handleEnd = () => {
+  const handleToggleMute = async () => {
+    const next = !isMuted;
+    setIsMuted(next);
+    await agoraService.setMuted(next);
+  };
+
+  const handleEnd = async () => {
+    const callId = activeCallIdRef.current;
+    try {
+      if (callId) {
+        await api.updateCallStatus(callId, 'canceled');
+      }
+      await agoraService.leaveChannel();
+    } catch (e) {
+      console.warn('Error ending outgoing call:', e);
+    }
     navigation.goBack();
   };
 
@@ -200,7 +242,6 @@ export default function OutgoingCallScreen({ navigation, route }) {
           { paddingBottom: Math.max(insets.bottom + 20, 40) },
         ]}
       >
-        {/* Back Button */}
         <TouchableOpacity
           onPress={handleEnd}
           style={styles.backButton}
@@ -209,7 +250,6 @@ export default function OutgoingCallScreen({ navigation, route }) {
           <Ionicons name="chevron-back" size={24} color="#FFFFFF" />
         </TouchableOpacity>
 
-        {/* Center Caller Section */}
         <View style={styles.centerSection}>
           <View style={styles.avatarWrapper}>
             <LinearGradient
@@ -226,7 +266,6 @@ export default function OutgoingCallScreen({ navigation, route }) {
           <Text style={styles.timerText}>00:00</Text>
         </View>
 
-        {/* Shield Status Note */}
         <View style={styles.shieldNote}>
           <Ionicons name="shield-checkmark-outline" size={18} color="#22C55E" style={styles.shieldIcon} />
           <Text style={styles.shieldNoteText}>
@@ -234,11 +273,10 @@ export default function OutgoingCallScreen({ navigation, route }) {
           </Text>
         </View>
 
-        {/* Call Controls */}
         <View style={styles.controlsRow}>
           <TouchableOpacity
             activeOpacity={0.7}
-            onPress={() => setIsMuted(!isMuted)}
+            onPress={handleToggleMute}
             style={[styles.controlBtn, isMuted && styles.controlBtnActive]}
           >
             <Ionicons name={isMuted ? 'mic-off' : 'mic'} size={22} color={isMuted ? '#EF4444' : '#FFFFFF'} />
@@ -279,7 +317,6 @@ export default function OutgoingCallScreen({ navigation, route }) {
           </TouchableOpacity>
         </View>
 
-        {/* DTMF Keypad Overlay */}
         {showKeypad && (
           <View style={styles.keypadOverlay}>
             <View style={styles.keypadOverlayHeader}>
@@ -302,7 +339,6 @@ export default function OutgoingCallScreen({ navigation, route }) {
           </View>
         )}
 
-        {/* End Call Button */}
         <View style={styles.endCallContainer}>
           <TouchableOpacity
             activeOpacity={0.8}

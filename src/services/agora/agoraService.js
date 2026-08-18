@@ -1,3 +1,4 @@
+import { Audio } from 'expo-av';
 import { config, ENDPOINTS } from '../../constants/config';
 import { api } from '../api/client';
 import { useCallStore } from '../../store/callStore';
@@ -9,12 +10,65 @@ class AgoraService {
     this.rtmClient = null;
     this.currentChannel = null;
     this.isLoggedIn = false;
+    this.isEngineReady = false;
     this.userId = null;
     this.eventListeners = {};
     this.ws = null;
     this.pollerInterval = null;
     this.pingInterval = null;
     this.authToken = null;
+    this.remoteUsers = new Set();
+  }
+
+  async requestMicrophonePermission() {
+    try {
+      const { status } = await Audio.requestPermissionsAsync();
+      return status === 'granted';
+    } catch (e) {
+      console.warn('Microphone permission request failed:', e);
+      return false;
+    }
+  }
+
+  _registerRtcEventHandlers() {
+    if (!this.rtcEngine || typeof this.rtcEngine.registerEventHandler !== 'function') return;
+
+    this.rtcEngine.registerEventHandler({
+      onJoinChannelSuccess: (connection, elapsed) => {
+        console.log(`Agora: joined channel ${connection?.channelId || this.currentChannel} (${elapsed}ms)`);
+        useCallStore.getState().setConnectionState('connected');
+        this.emit('channel_joined', { channelName: connection?.channelId || this.currentChannel });
+      },
+      onUserJoined: (connection, remoteUid, elapsed) => {
+        console.log(`Agora: remote user ${remoteUid} joined (${elapsed}ms)`);
+        this.remoteUsers.add(remoteUid);
+        useCallStore.getState().setConnectionState('connected');
+        this.emit('remote_user_joined', { uid: remoteUid, channelName: connection?.channelId });
+      },
+      onUserOffline: (connection, remoteUid, reason) => {
+        console.log(`Agora: remote user ${remoteUid} offline (reason ${reason})`);
+        this.remoteUsers.delete(remoteUid);
+        if (this.remoteUsers.size === 0) {
+          useCallStore.getState().setConnectionState('disconnected');
+        }
+        this.emit('remote_user_left', { uid: remoteUid, reason });
+      },
+      onRemoteAudioStateChanged: (connection, remoteUid, state, reason, elapsed) => {
+        console.log(`Agora: remote audio uid=${remoteUid} state=${state} reason=${reason}`);
+        if (state === 2) {
+          this.emit('remote_audio_started', { uid: remoteUid });
+        }
+      },
+      onError: (err, msg) => {
+        console.warn(`Agora RTC error ${err}: ${msg}`);
+        this.emit('rtc_error', { err, msg });
+      },
+      onLeaveChannel: (connection, stats) => {
+        console.log('Agora: left channel');
+        this.remoteUsers.clear();
+        useCallStore.getState().setConnectionState('disconnected');
+      },
+    });
   }
 
   async init(userId, authToken) {
@@ -23,11 +77,12 @@ class AgoraService {
     if (authToken) this.authToken = authToken;
 
     try {
-      // Try loading native Agora RTC modules if available
       try {
         const { createAgoraRtcEngine, ChannelProfileType, ClientRoleType } = require('react-native-agora');
         this.rtcEngine = createAgoraRtcEngine();
         this.rtcEngine.initialize({ appId: this.appId });
+        this._registerRtcEventHandlers();
+
         if (typeof this.rtcEngine.setChannelProfile === 'function') {
           this.rtcEngine.setChannelProfile(ChannelProfileType?.ChannelProfileCommunication ?? 0);
         }
@@ -39,16 +94,18 @@ class AgoraService {
           this.rtcEngine.enableLocalAudio(true);
         }
         if (typeof this.rtcEngine.setDefaultAudioRouteToSpeakerphone === 'function') {
-          this.rtcEngine.setDefaultAudioRouteToSpeakerphone(true);
+          this.rtcEngine.setDefaultAudioRouteToSpeakerphone(false);
         }
+        this.isEngineReady = true;
+        console.log(`Agora RTC engine ready (appId: ${this.appId?.substring(0, 8)}...)`);
       } catch (e) {
-        console.warn('Agora RTC Native module not loaded, using web/demo engine fallback.');
+        this.isEngineReady = false;
+        console.warn('Agora RTC Native module not loaded. Voice calls require a dev client build (not Expo Go).', e?.message);
       }
 
       this.isLoggedIn = true;
       console.log(`Agora service initialized for user: ${this.userId}`);
 
-      // Start real-time WebSocket signaling connection & poller
       if (this.authToken) {
         this.connectSignaling(this.authToken);
       }
@@ -131,8 +188,6 @@ class AgoraService {
     this.pollerInterval = setInterval(async () => {
       try {
         if (!this.isLoggedIn) return;
-        // Skip polling if WebSocket signaling is connected and healthy
-        if (this.ws && this.ws.readyState === WebSocket.OPEN) return;
 
         const state = useCallStore.getState();
         if (state.incomingCall || state.status === 'active') return;
@@ -174,14 +229,19 @@ class AgoraService {
   }
 
   async sendCallInvitation(targetUserId, channelName, callId, callerName) {
-    console.log(`Sending call invite to ${targetUserId} for channel ${channelName}`);
-    // api.logCall automatically dispatches real-time WebSocket invite to target user
+    console.log(`Call invite dispatched via logCall for ${targetUserId}, channel ${channelName}`);
     return { status: 'sent', channelName, callId };
+  }
+
+  _normalizeStatus(action) {
+    if (action === 'accept') return 'answered';
+    if (action === 'decline') return 'declined';
+    return action;
   }
 
   async respondToCallInvitation(callerUserId, action, channelName, callId) {
     console.log(`Responding to call invitation: ${action}`);
-    const normalizedStatus = action === 'accept' ? 'answered' : action;
+    const normalizedStatus = this._normalizeStatus(action);
 
     if (this.ws && this.ws.readyState === WebSocket.OPEN && callId) {
       try {
@@ -215,28 +275,43 @@ class AgoraService {
   }
 
   async joinChannel(channelName, token, uid) {
+    if (!this.isEngineReady || !this.rtcEngine) {
+      console.warn('Cannot join channel: Agora RTC engine not available. Rebuild with expo-dev-client.');
+      return false;
+    }
+
     this.currentChannel = channelName;
+    useCallStore.getState().setConnectionState('connecting');
+
     try {
-      if (this.rtcEngine) {
-        const mediaOptions = {
-          clientRoleType: 1, // ClientRoleBroadcaster
-          publishMicrophoneTrack: true,
-          autoSubscribeAudio: true,
-        };
-        await this.rtcEngine.joinChannel(token, channelName, uid || 0, mediaOptions);
-        if (typeof this.rtcEngine.enableAudio === 'function') {
-          await this.rtcEngine.enableAudio();
-        }
-        if (typeof this.rtcEngine.enableLocalAudio === 'function') {
-          await this.rtcEngine.enableLocalAudio(true);
-        }
-        if (typeof this.rtcEngine.muteLocalAudioStream === 'function') {
-          await this.rtcEngine.muteLocalAudioStream(false);
-        }
+      await this.requestMicrophonePermission();
+
+      const mediaOptions = {
+        clientRoleType: 1,
+        publishMicrophoneTrack: true,
+        autoSubscribeAudio: true,
+      };
+      await this.rtcEngine.joinChannel(token, channelName, uid || 0, mediaOptions);
+
+      if (typeof this.rtcEngine.enableAudio === 'function') {
+        await this.rtcEngine.enableAudio();
       }
+      if (typeof this.rtcEngine.enableLocalAudio === 'function') {
+        await this.rtcEngine.enableLocalAudio(true);
+      }
+      if (typeof this.rtcEngine.muteLocalAudioStream === 'function') {
+        await this.rtcEngine.muteLocalAudioStream(false);
+      }
+      if (typeof this.rtcEngine.muteAllRemoteAudioStreams === 'function') {
+        await this.rtcEngine.muteAllRemoteAudioStreams(false);
+      }
+
       console.log(`Joined Agora RTC channel: ${channelName}`);
+      return true;
     } catch (e) {
       console.warn('Error joining Agora RTC channel:', e);
+      useCallStore.getState().setConnectionState('error');
+      return false;
     }
   }
 
@@ -250,6 +325,8 @@ class AgoraService {
       console.warn('Error leaving Agora RTC channel:', e);
     } finally {
       this.currentChannel = null;
+      this.remoteUsers.clear();
+      useCallStore.getState().setConnectionState('disconnected');
     }
   }
 
@@ -275,6 +352,10 @@ class AgoraService {
 
   getEngine() {
     return this.rtcEngine;
+  }
+
+  isRtcAvailable() {
+    return this.isEngineReady && !!this.rtcEngine;
   }
 
   getMediaEngine() {
