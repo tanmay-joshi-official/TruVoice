@@ -89,18 +89,16 @@ class AudioProcessorService {
 
     console.log(`Starting AudioProcessorService for call ${callId}, caller ${callerNumber}`);
 
-    // Register Agora raw audio frame observer
+    // Analyze only the audio rendered by Agora. Record frames are this device's
+    // microphone and mixed frames include it, which analyzes the wrong person.
     this.frameObserver = {
-      onRecordAudioFrame: (channelId, audioFrame) => {
-        if (!this.isProcessing || this.isMuted || this.isStopped) return;
-        this._handleAudioFrame(audioFrame);
-      },
-      onMixedAudioFrame: (channelId, audioFrame) => {
+      onPlaybackAudioFrame: (channelId, audioFrame) => {
         if (!this.isProcessing || this.isMuted || this.isStopped) return;
         this._handleAudioFrame(audioFrame);
       },
     };
 
+    agoraService.configurePlaybackAudioFrames(this.sampleRate, this.numChannels);
     agoraService.registerAudioFrameObserver(this.frameObserver);
 
     // Schedule 20-second chunk processing timer

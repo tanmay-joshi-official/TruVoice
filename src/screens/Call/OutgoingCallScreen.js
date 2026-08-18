@@ -109,6 +109,7 @@ export default function OutgoingCallScreen({ navigation, route }) {
             if (loggedCallId) {
               await api.updateCallStatus(loggedCallId, 'canceled');
             }
+            await agoraService.leaveChannel();
             if (isMounted) {
               setCallStatusText('Call setup failed');
               setTimeout(() => safeGoBack(navigation, ROUTES.MAIN_TABS), 1500);
@@ -120,6 +121,7 @@ export default function OutgoingCallScreen({ navigation, route }) {
           if (loggedCallId) {
             await api.updateCallStatus(loggedCallId, 'canceled');
           }
+          await agoraService.leaveChannel();
           if (isMounted) {
             setCallStatusText('Call setup failed');
             setTimeout(() => safeGoBack(navigation, ROUTES.MAIN_TABS), 1500);
@@ -140,6 +142,7 @@ export default function OutgoingCallScreen({ navigation, route }) {
                 if (isMounted) {
                   setCallStatusText(callDetail.data.status === 'declined' ? 'Call Declined' : 'Call Ended');
                   if (pollInterval) clearInterval(pollInterval);
+                  await agoraService.leaveChannel();
                   setTimeout(() => safeGoBack(navigation, ROUTES.MAIN_TABS), 1500);
                 }
               }
@@ -149,11 +152,12 @@ export default function OutgoingCallScreen({ navigation, route }) {
           }, 2000);
         }
 
-        timeoutTimer = setTimeout(() => {
+        timeoutTimer = setTimeout(async () => {
           if (isMounted && !hasNavigatedRef.current) {
             setCallStatusText('No Answer');
             if (pollInterval) clearInterval(pollInterval);
             if (loggedCallId) api.updateCallStatus(loggedCallId, 'canceled');
+            await agoraService.leaveChannel();
             setTimeout(() => safeGoBack(navigation, ROUTES.MAIN_TABS), 1500);
           }
         }, 45000);
@@ -162,6 +166,7 @@ export default function OutgoingCallScreen({ navigation, route }) {
         console.warn('Outgoing Agora call error:', err);
         if (isMounted) {
           setCallStatusText('Call Failed');
+          await agoraService.leaveChannel();
           setTimeout(() => {
             if (isMounted) safeGoBack(navigation, ROUTES.MAIN_TABS);
           }, 2000);
@@ -186,6 +191,7 @@ export default function OutgoingCallScreen({ navigation, route }) {
         if (String(data.callId) === String(currentCallId) || !data.callId) {
           if (isMounted) {
             setCallStatusText(data.action === 'declined' || data.action === 'decline' ? 'Call Declined' : 'Call Ended');
+            agoraService.leaveChannel().catch(() => {});
             setTimeout(() => safeGoBack(navigation, ROUTES.MAIN_TABS), 1500);
           }
         }

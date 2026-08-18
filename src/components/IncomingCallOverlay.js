@@ -21,6 +21,7 @@ export default function IncomingCallOverlay() {
   const incomingCall = useCallStore((s) => s.incomingCall);
   const clearIncomingCall = useCallStore((s) => s.clearIncomingCall);
   const setCallId = useCallStore((s) => s.setCallId);
+  const setChannelName = useCallStore((s) => s.setChannelName);
 
   if (!incomingCall) return null;
 
@@ -28,6 +29,7 @@ export default function IncomingCallOverlay() {
     try {
       const { channelName, callId, callerName, callerUserId } = incomingCall;
       setCallId(callId);
+      setChannelName(channelName);
       if (callId) agoraService.markCallHandled(callId);
 
       const micGranted = await agoraService.requestMicrophonePermission();

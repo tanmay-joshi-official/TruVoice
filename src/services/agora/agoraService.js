@@ -303,11 +303,13 @@ class AgoraService {
 
   _computeUid() {
     const source = String(this.userId || 'truvoice-user-' + Date.now());
-    let hash = 0;
+    // Must match app.services.agora_service.generate_rtc_token exactly. Agora
+    // rejects a token when the UID embedded in it differs from joinChannel's.
+    let uid = 0;
     for (let i = 0; i < source.length; i += 1) {
-      hash = (hash * 31 + source.charCodeAt(i)) >>> 0;
+      uid = (uid + (i + 1) * source.charCodeAt(i)) % 1000000000;
     }
-    return (hash % 1000000000) + 1;
+    return uid + 1;
   }
 
   async joinChannel(channelName, token, uid) {
@@ -367,7 +369,9 @@ class AgoraService {
     } finally {
       this.currentChannel = null;
       this.remoteUsers.clear();
-      useCallStore.getState().setConnectionState('disconnected');
+      // Do not leave a completed call marked active/outgoing: that disables
+      // pending-call polling and prevents future calls from being received.
+      useCallStore.getState().resetCall();
     }
   }
 
@@ -418,6 +422,24 @@ class AgoraService {
       }
     } catch (e) {
       console.warn('Error registering audio frame observer on Agora MediaEngine:', e);
+    }
+    return null;
+  }
+
+  configurePlaybackAudioFrames(sampleRate = 16000, channels = 1, samplesPerCall = 1024) {
+    try {
+      if (this.rtcEngine && typeof this.rtcEngine.setPlaybackAudioFrameParameters === 'function') {
+        // RawAudioFrameOpModeReadOnly. Explicit configuration is required by
+        // Agora before it dispatches onPlaybackAudioFrame callbacks.
+        return this.rtcEngine.setPlaybackAudioFrameParameters(
+          sampleRate,
+          channels,
+          0,
+          samplesPerCall,
+        );
+      }
+    } catch (e) {
+      console.warn('Error configuring Agora playback audio frames:', e);
     }
     return null;
   }
