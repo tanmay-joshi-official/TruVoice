@@ -16,6 +16,7 @@ class AgoraService {
     this.ws = null;
     this.pollerInterval = null;
     this.pingInterval = null;
+    this.reconnectTimer = null;
     this.authToken = null;
     this.remoteUsers = new Set();
     this.handledCallIds = new Set();
@@ -80,7 +81,14 @@ class AgoraService {
 
   async init(userId, authToken) {
     if (!userId) return;
-    this.userId = String(userId);
+
+    const normalizedUserId = String(userId);
+    const sameSession = this.isLoggedIn && this.userId === normalizedUserId && this.authToken === authToken;
+    if (sameSession && this.ws && (this.ws.readyState === WebSocket.OPEN || this.ws.readyState === WebSocket.CONNECTING)) {
+      return;
+    }
+
+    this.userId = normalizedUserId;
     if (authToken) this.authToken = authToken;
 
     try {
@@ -116,7 +124,9 @@ class AgoraService {
       if (this.authToken) {
         this.connectSignaling(this.authToken);
       }
-      this.startPendingCallPoller();
+      if (!this.pollerInterval) {
+        this.startPendingCallPoller();
+      }
     } catch (err) {
       console.warn('Agora initialization error:', err);
     }
@@ -127,6 +137,9 @@ class AgoraService {
     this.authToken = token;
 
     try {
+      if (this.ws && (this.ws.readyState === WebSocket.OPEN || this.ws.readyState === WebSocket.CONNECTING)) {
+        return;
+      }
       if (this.ws) {
         try { this.ws.close(); } catch (e) {}
       }
@@ -175,7 +188,8 @@ class AgoraService {
       this.ws.onclose = () => {
         console.log('User signaling WebSocket closed. Reconnecting in 5s...');
         if (this.pingInterval) clearInterval(this.pingInterval);
-        setTimeout(() => {
+        if (this.reconnectTimer) clearTimeout(this.reconnectTimer);
+        this.reconnectTimer = setTimeout(() => {
           if (this.authToken && this.isLoggedIn) {
             this.connectSignaling(this.authToken);
           }
@@ -191,13 +205,13 @@ class AgoraService {
   }
 
   startPendingCallPoller() {
-    if (this.pollerInterval) clearInterval(this.pollerInterval);
+    if (this.pollerInterval) return;
     this.pollerInterval = setInterval(async () => {
       try {
         if (!this.isLoggedIn) return;
 
         const state = useCallStore.getState();
-        if (state.incomingCall || state.status === 'active') return;
+        if (state.incomingCall || state.status === 'active' || state.status === 'outgoing') return;
 
         const res = await api.getPendingCall();
         if (res.data?.has_pending) {

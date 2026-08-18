@@ -49,8 +49,8 @@ export const useCallStore = create((set, get) => ({
   setTargetUserId: (targetUserId) => set({ targetUserId }),
   setCallerUser: (callerUser) => set({ callerUser }),
   setPhoneNumber: (phoneNumber) => set({ phoneNumber }),
-  setIncomingCall: (incomingCall) => set({ incomingCall, status: CALL_STATUS.INCOMING }),
-  clearIncomingCall: () => set({ incomingCall: null }),
+  setIncomingCall: (incomingCall) => set({ incomingCall, status: CALL_STATUS.INCOMING, error: null }),
+  clearIncomingCall: () => set({ incomingCall: null, status: CALL_STATUS.IDLE, error: null }),
 
   setStatus: (status) => set({ status }),
   setConnectionState: (connectionState) => set({ connectionState }),
