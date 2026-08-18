@@ -328,14 +328,8 @@ class AgoraService {
         autoSubscribeAudio: true,
       };
 
-      const resolvedUid = uid ?? this._computeUid();
-      const userAccount = this.userId ? String(this.userId) : `truvoice-${Date.now()}`;
-
-      if (typeof this.rtcEngine.joinChannelWithUserAccount === 'function') {
-        await this.rtcEngine.joinChannelWithUserAccount(token, channelName, userAccount, mediaOptions);
-      } else {
-        await this.rtcEngine.joinChannel(token, channelName, resolvedUid, mediaOptions);
-      }
+      const resolvedUid = Number.isInteger(uid) && uid !== 0 ? uid : this._computeUid();
+      await this.rtcEngine.joinChannel(token, channelName, resolvedUid, mediaOptions);
 
       if (typeof this.rtcEngine.enableAudio === 'function') {
         await this.rtcEngine.enableAudio();
@@ -353,7 +347,7 @@ class AgoraService {
         await this.rtcEngine.setEnableSpeakerphone(true);
       }
 
-      console.log(`Joined Agora RTC channel: ${channelName} using uid/userAccount ${userAccount}`);
+      console.log(`Joined Agora RTC channel: ${channelName} using uid ${resolvedUid}`);
       return true;
     } catch (e) {
       console.warn('Error joining Agora RTC channel:', e);

@@ -92,7 +92,7 @@ export default function IncomingCallScreen({ navigation, route }) {
       if (channelName) {
         const tokenRes = await api.getAgoraToken(channelName);
         const token = tokenRes.data?.token;
-        const joined = await agoraService.joinChannel(channelName, token, 0);
+        const joined = await agoraService.joinChannel(channelName, token);
         if (!joined) {
           if (callId) {
             await api.updateCallStatus(callId, 'canceled');

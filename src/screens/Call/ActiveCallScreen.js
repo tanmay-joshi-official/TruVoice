@@ -150,7 +150,7 @@ export default function ActiveCallScreen({ navigation, route }) {
             playThroughEarpieceAndroid: false,
           });
           const tokenRes = await api.getAgoraToken(channelNameParam);
-          await agoraService.joinChannel(channelNameParam, tokenRes.data?.token, 0);
+          await agoraService.joinChannel(channelNameParam, tokenRes.data?.token);
         } catch (e) {
           console.warn('ActiveCallScreen channel join warning:', e);
         }
