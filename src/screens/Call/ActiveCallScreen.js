@@ -34,6 +34,10 @@ import { useVoiceAnalysis } from '../../hooks/useVoiceAnalysis';
 import { agoraService } from '../../services/agora/agoraService';
 import { api } from '../../services/api/client';
 
+// Temporary call-only test mode. Change to true only after two-way Agora audio
+// is confirmed working, then re-enable analysis components one at a time.
+const ENABLE_AI_ANALYSIS = false;
+
 
 
 function PulseRing() {
@@ -107,7 +111,7 @@ export default function ActiveCallScreen({ navigation, route }) {
   const hasEndedRef = useRef(false);
 
   const activeCallId = route.params?.callId || useCallStore((s) => s.callId);
-  useVoiceAnalysis(activeCallId);
+  useVoiceAnalysis(ENABLE_AI_ANALYSIS ? activeCallId : null);
 
   const realTimeTrustScore = useCallStore((s) => s.trustScore);
   const realTimeRiskLevel = useCallStore((s) => s.riskLevel);
@@ -130,7 +134,7 @@ export default function ActiveCallScreen({ navigation, route }) {
   );
 
   const callerNumber = contact.number || contact.phone_number || '';
-  const shouldAnalyze = !isSavedContact && !analysisStopped;
+  const shouldAnalyze = ENABLE_AI_ANALYSIS && !isSavedContact && !analysisStopped;
 
 
   useEffect(() => {
