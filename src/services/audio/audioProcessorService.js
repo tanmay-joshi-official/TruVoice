@@ -1,6 +1,7 @@
 import { agoraService } from '../agora/agoraService';
 import { api } from '../api/client';
 
+
 function uint8ToBase64(uint8) {
   const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/';
   let base64 = '';
