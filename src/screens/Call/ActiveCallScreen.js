@@ -109,6 +109,7 @@ export default function ActiveCallScreen({ navigation, route }) {
   const transcriptLinesRef = useRef([]);
   const lastAnalysisRef = useRef(null);
   const hasEndedRef = useRef(false);
+  const secondsRef = useRef(0);
 
   const activeCallId = route.params?.callId || useCallStore((s) => s.callId);
   useVoiceAnalysis(ENABLE_AI_ANALYSIS ? activeCallId : null);
@@ -135,6 +136,23 @@ export default function ActiveCallScreen({ navigation, route }) {
 
   const callerNumber = contact.number || contact.phone_number || '';
   const shouldAnalyze = ENABLE_AI_ANALYSIS && !isSavedContact && !analysisStopped;
+
+  const finishCall = useCallback(() => {
+    if (hasEndedRef.current) return;
+    hasEndedRef.current = true;
+    audioProcessorService.stop();
+    agoraService.leaveChannel().catch((e) => {
+      console.warn('Error leaving Agora call:', e);
+    });
+    const elapsed = secondsRef.current;
+    navigation.replace(ROUTES.CALL_SUMMARY, {
+      contact,
+      isSavedContact,
+      duration: `${Math.floor(elapsed / 60)}m ${elapsed % 60}s`,
+      transcript: transcriptLinesRef.current,
+      lastAnalysis: lastAnalysisRef.current,
+    });
+  }, [navigation, contact, isSavedContact]);
 
 
   useEffect(() => {
@@ -166,16 +184,7 @@ export default function ActiveCallScreen({ navigation, route }) {
     const handleCallEndedSignal = (data) => {
       const isThisCall = !data.callId || String(data.callId) === String(activeCallId);
       if (isThisCall && !hasEndedRef.current && ['ended', 'declined', 'canceled', 'busy'].includes(data.action)) {
-        hasEndedRef.current = true;
-        audioProcessorService.stop();
-        agoraService.leaveChannel().catch(() => {});
-        navigation.replace(ROUTES.CALL_SUMMARY, {
-          contact,
-          isSavedContact,
-          duration: `${Math.floor(seconds / 60)}m ${seconds % 60}s`,
-          transcript: transcriptLinesRef.current,
-          lastAnalysis: lastAnalysisRef.current,
-        });
+        finishCall();
       }
     };
 
@@ -183,14 +192,39 @@ export default function ActiveCallScreen({ navigation, route }) {
     return () => {
       agoraService.off('call_response', handleCallEndedSignal);
     };
-  }, []);
+  }, [activeCallId, finishCall]);
 
   useEffect(() => {
     const timer = setInterval(() => {
-      setSeconds((prev) => prev + 1);
+      setSeconds((prev) => {
+        const next = prev + 1;
+        secondsRef.current = next;
+        return next;
+      });
     }, 1000);
     return () => clearInterval(timer);
   }, []);
+
+  useEffect(() => {
+    if (!activeCallId) return undefined;
+
+    const terminalStatuses = new Set(['ended', 'declined', 'canceled', 'busy']);
+    const checkForRemoteHangup = async () => {
+      if (hasEndedRef.current) return;
+      try {
+        const response = await api.getVoiceCallDetail(activeCallId);
+        if (terminalStatuses.has(response.data?.status)) {
+          console.log(`Call ${activeCallId} ended according to status poll.`);
+          finishCall();
+        }
+      } catch (e) {
+        // Signaling remains the primary mechanism; retry on the next poll.
+      }
+    };
+
+    const interval = setInterval(checkForRemoteHangup, 1500);
+    return () => clearInterval(interval);
+  }, [activeCallId, finishCall]);
 
   useEffect(() => {
     if (!shouldAnalyze) return;
@@ -263,26 +297,8 @@ export default function ActiveCallScreen({ navigation, route }) {
 
   const handleEndCall = async () => {
     if (hasEndedRef.current) return;
-    hasEndedRef.current = true;
-    audioProcessorService.stop();
-    try {
-      if (activeCallId) {
-        // Signal first, so the other participant receives the hangup before
-        // this device tears down the call and navigates away.
-        await api.updateCallStatus(activeCallId, 'ended', seconds);
-      }
-      await agoraService.leaveChannel();
-    } catch (e) {
-      console.warn('Error ending Agora call:', e);
-    }
-    const duration = `${Math.floor(seconds / 60)}m ${seconds % 60}s`;
-    navigation.replace(ROUTES.CALL_SUMMARY, {
-      contact,
-      isSavedContact,
-      duration,
-      transcript: transcriptLinesRef.current,
-      lastAnalysis: lastAnalysisRef.current,
-    });
+    agoraService.endCall(activeCallId, secondsRef.current);
+    finishCall();
   };
 
 

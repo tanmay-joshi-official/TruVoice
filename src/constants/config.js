@@ -29,7 +29,9 @@ const DEFAULT_WS_BASE_URL = DEFAULT_API_BASE_URL
 export const config = {
   apiBaseUrl: DEFAULT_API_BASE_URL,
   wsBaseUrl: DEFAULT_WS_BASE_URL,
-  agoraAppId: process.env.EXPO_PUBLIC_AGORA_APP_ID || Constants.expoConfig?.extra?.agoraAppId || 'agora_demo_app_id',
+  // Never silently use a placeholder: both callers must use the App ID from
+  // the same Agora project as the token-generating backend.
+  agoraAppId: process.env.EXPO_PUBLIC_AGORA_APP_ID || Constants.expoConfig?.extra?.agoraAppId || '',
   apiTimeout: 60000,
   splashDuration: 2500,
   onboardingSlides: 3,

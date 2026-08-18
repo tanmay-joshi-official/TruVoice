@@ -20,6 +20,7 @@ class AgoraService {
     this.authToken = null;
     this.remoteUsers = new Set();
     this.handledCallIds = new Set();
+    this.pendingEndCallIds = new Set();
   }
 
   markCallHandled(callId) {
@@ -102,6 +103,9 @@ class AgoraService {
 
     try {
       try {
+        if (!this.appId) {
+          throw new Error('Missing EXPO_PUBLIC_AGORA_APP_ID. Set it to the App ID used by the backend.');
+        }
         const { createAgoraRtcEngine, ChannelProfileType, ClientRoleType } = require('react-native-agora');
         this.rtcEngine = createAgoraRtcEngine();
         this.rtcEngine.initialize({ appId: this.appId });
@@ -188,6 +192,8 @@ class AgoraService {
             };
             this.lastCallResponse = respPayload;
             this.emit('call_response', respPayload);
+          } else if (msg.type === 'update_call_status_success') {
+            this.pendingEndCallIds.delete(String(msg.call_id));
           }
         } catch (e) {
           console.warn('Error parsing signaling message:', e);
@@ -319,6 +325,44 @@ class AgoraService {
       uid = (uid + (i + 1) * source.charCodeAt(i)) % 1000000000;
     }
     return uid + 1;
+  }
+
+  endCall(callId, duration = 0) {
+    if (!callId) return;
+
+    const normalizedCallId = String(callId);
+    const payload = {
+      call_id: normalizedCallId,
+      status: 'ended',
+      duration,
+    };
+
+    // WebSocket signaling reaches the other participant immediately. Do not
+    // wait for an HTTP round trip before hanging up the local call.
+    if (this.ws && this.ws.readyState === WebSocket.OPEN) {
+      this.pendingEndCallIds.add(normalizedCallId);
+      try {
+        this.ws.send(JSON.stringify({ type: 'update_call_status', payload }));
+      } catch (e) {
+        console.warn('Error sending immediate call-end signal:', e);
+        this.pendingEndCallIds.delete(normalizedCallId);
+        api.updateCallStatus(normalizedCallId, 'ended', duration)
+          .catch((error) => console.warn('Call-end HTTP update failed:', error));
+        return;
+      }
+
+      // Keep an HTTP fallback for a dropped signaling message. The server's
+      // success acknowledgement cancels it, avoiding duplicate broadcasts.
+      setTimeout(() => {
+        if (!this.pendingEndCallIds.delete(normalizedCallId)) return;
+        api.updateCallStatus(normalizedCallId, 'ended', duration)
+          .catch((error) => console.warn('Call-end HTTP fallback failed:', error));
+      }, 2000);
+      return;
+    }
+
+    api.updateCallStatus(normalizedCallId, 'ended', duration)
+      .catch((error) => console.warn('Call-end HTTP update failed:', error));
   }
 
   async joinChannel(channelName, token, uid) {
