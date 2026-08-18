@@ -20,10 +20,15 @@ import PrimaryButton from '../../components/buttons/PrimaryButton';
 import { ROUTES } from '../../constants/routes';
 import { analysisService } from '../../services/analysis/analysisService';
 import { colors } from '../../theme';
+import { safeGoBack } from '../../utils/navigationHelper';
 
 export default function ReportScamScreen({ navigation, route }) {
   const insets = useSafeAreaInsets();
-  const phoneNumber = route.params?.phone_number || '';
+  const initialCall = route.params?.call || {};
+  const [scamCategory, setScamCategory] = useState('Impersonation / Vishing');
+  const [phoneNumber, setPhoneNumber] = useState(
+    initialCall.number || initialCall.phone_number || '',
+  );
   const callSummary = route.params?.call_summary || {};
 
   const [description, setDescription] = useState('');
@@ -40,7 +45,7 @@ export default function ReportScamScreen({ navigation, route }) {
 
   const handleSubmit = async () => {
     if (!description.trim()) {
-      setError('Please describe what happened before submitting.');
+      setError('Please add a brief description of what happened.');
       return;
     }
     if (!phoneNumber) {
@@ -51,7 +56,8 @@ export default function ReportScamScreen({ navigation, route }) {
     setError('');
     setIsSubmitting(true);
     try {
-      const result = await analysisService.submitScamComplaint(
+      const result = await analysisService.reportScam(
+        scamCategory,
         phoneNumber,
         description.trim(),
       );
@@ -62,14 +68,7 @@ export default function ReportScamScreen({ navigation, route }) {
           {
             text: 'Done',
             onPress: () => {
-              if (navigation.canGoBack()) {
-                navigation.goBack();
-              } else {
-                navigation.reset({
-                  index: 0,
-                  routes: [{ name: ROUTES.MAIN_TABS }],
-                });
-              }
+              safeGoBack(navigation, ROUTES.MAIN_TABS);
             },
           },
         ],
@@ -96,7 +95,7 @@ export default function ReportScamScreen({ navigation, route }) {
           <View style={[styles.container, { paddingBottom: Math.max(insets.bottom + 20, 24) }]}>
             <View style={styles.header}>
               <TouchableOpacity
-                onPress={() => navigation.goBack()}
+                onPress={() => safeGoBack(navigation, ROUTES.MAIN_TABS)}
                 style={styles.backBtn}
                 activeOpacity={0.7}
               >

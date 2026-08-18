@@ -15,36 +15,33 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import FloatingCallButton from '../../components/buttons/FloatingCallButton';
 import { ROUTES } from '../../constants/routes';
 import { colors } from '../../theme';
+import { safeGoBack } from '../../utils/navigationHelper';
 
 // Real notifications will be populated from backend push/socket events
 // No hardcoded dummy data
-const INITIAL_NOTIFICATIONS = [];
+const MOCK_NOTIFICATIONS = [];
 
 export default function NotificationsScreen({ navigation }) {
   const insets = useSafeAreaInsets();
-  const [notifications, setNotifications] = useState(INITIAL_NOTIFICATIONS);
+  const [notifications, setNotifications] = useState(MOCK_NOTIFICATIONS);
 
-  const unreadCount = notifications.filter((n) => !n.read).length;
+  const unreadCount = notifications.filter((item) => !item.read).length;
+
+  const handleMarkAllRead = () => {
+    setNotifications((prev) =>
+      prev.map((item) => ({ ...item, read: true })),
+    );
+  };
 
   const handleNotificationPress = (item) => {
     setNotifications((prev) =>
-      prev.map((n) => (n.id === item.id ? { ...n, read: true } : n))
+      prev.map((n) => (n.id === item.id ? { ...n, read: true } : n)),
     );
-
     if (item.targetRoute) {
       navigation.navigate(item.targetRoute, {
-        contact: { name: 'Unknown Caller', number: '+1 415 220', initials: 'UC' },
+        ...(item.targetParams || {}),
       });
-    } else {
-      Alert.alert(
-        item.title,
-        `${item.description}\n\nDetection model v2.4 active with 98.4% accuracy.`
-      );
     }
-  };
-
-  const handleMarkAllRead = () => {
-    setNotifications((prev) => prev.map((n) => ({ ...n, read: true })));
   };
 
   return (
@@ -55,7 +52,7 @@ export default function NotificationsScreen({ navigation }) {
         <View style={styles.header}>
           <View style={styles.headerTop}>
             <TouchableOpacity
-              onPress={() => navigation.goBack()}
+              onPress={() => safeGoBack(navigation, ROUTES.MAIN_TABS)}
               style={styles.backBtn}
             >
               <Ionicons name="chevron-back" size={24} color="#FFFFFF" />

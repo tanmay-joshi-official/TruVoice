@@ -16,6 +16,7 @@ import PrimaryButton from '../../components/buttons/PrimaryButton';
 import { ROUTES } from '../../constants/routes';
 import { useAuthStore } from '../../store/authStore';
 import { config } from '../../constants/config';
+import { safeGoBack } from '../../utils/navigationHelper';
 
 export default function OtpScreen() {
   const navigation = useNavigation();
@@ -171,7 +172,7 @@ export default function OtpScreen() {
             )}
 
             <Pressable
-              onPress={() => navigation.goBack()}
+              onPress={() => safeGoBack(navigation)}
               className="mt-6 active:opacity-70"
             >
               <Text className="text-secondary text-sm">

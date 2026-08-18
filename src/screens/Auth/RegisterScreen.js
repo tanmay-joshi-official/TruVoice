@@ -15,6 +15,7 @@ import PrimaryButton from '../../components/buttons/PrimaryButton';
 import SecurityNote from '../../components/cards/SecurityNote';
 import { ROUTES } from '../../constants/routes';
 import { useAuthStore } from '../../store/authStore';
+import { safeGoBack } from '../../utils/navigationHelper';
 
 export default function RegisterScreen() {
   const navigation = useNavigation();

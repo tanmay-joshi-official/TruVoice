@@ -18,6 +18,13 @@ class AgoraService {
     this.pingInterval = null;
     this.authToken = null;
     this.remoteUsers = new Set();
+    this.handledCallIds = new Set();
+  }
+
+  markCallHandled(callId) {
+    if (callId) {
+      this.handledCallIds.add(String(callId));
+    }
   }
 
   async requestMicrophonePermission() {
@@ -195,6 +202,9 @@ class AgoraService {
         const res = await api.getPendingCall();
         if (res.data?.has_pending) {
           const { callId, channelName, callerUserId, callerName } = res.data;
+          if (callId && this.handledCallIds.has(String(callId))) {
+            return;
+          }
           console.log('Pending call detected via poller:', res.data);
           useCallStore.getState().setIncomingCall({
             callId,
@@ -241,6 +251,9 @@ class AgoraService {
 
   async respondToCallInvitation(callerUserId, action, channelName, callId) {
     console.log(`Responding to call invitation: ${action}`);
+    if (callId) {
+      this.markCallHandled(callId);
+    }
     const normalizedStatus = this._normalizeStatus(action);
 
     if (this.ws && this.ws.readyState === WebSocket.OPEN && callId) {

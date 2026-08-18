@@ -28,6 +28,7 @@ export default function IncomingCallOverlay() {
     try {
       const { channelName, callId, callerName, callerUserId } = incomingCall;
       setCallId(callId);
+      if (callId) agoraService.markCallHandled(callId);
 
       const micGranted = await agoraService.requestMicrophonePermission();
       if (!micGranted) {
@@ -76,7 +77,11 @@ export default function IncomingCallOverlay() {
   const handleDecline = async () => {
     try {
       const { channelName, callerUserId, callId } = incomingCall;
+      if (callId) agoraService.markCallHandled(callId);
       await agoraService.respondToCallInvitation(callerUserId, 'decline', channelName, callId);
+      if (callId) {
+        await api.updateCallStatus(callId, 'declined');
+      }
     } catch (err) {
       console.warn('Error declining call:', err);
     } finally {

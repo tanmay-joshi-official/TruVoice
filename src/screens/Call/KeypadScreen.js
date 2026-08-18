@@ -15,6 +15,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { ROUTES } from '../../constants/routes';
 import { useContactsStore } from '../../store/contactsStore';
 import { colors } from '../../theme';
+import { safeGoBack } from '../../utils/navigationHelper';
 
 const DIAL_KEYS = [
   { key: '1', sub: ' ' },
@@ -23,51 +24,64 @@ const DIAL_KEYS = [
   { key: '4', sub: 'G H I' },
   { key: '5', sub: 'J K L' },
   { key: '6', sub: 'M N O' },
-  { key: '7', sub: 'P R S' },
+  { key: '7', sub: 'P Q R S' },
   { key: '8', sub: 'T U V' },
-  { key: '9', sub: 'W X Y' },
-  { key: '*', sub: ' ' },
+  { key: '9', sub: 'W X Y Z' },
+  { key: '*', sub: '' },
   { key: '0', sub: '+' },
-  { key: '#', sub: ' ' },
+  { key: '#', sub: '' },
 ];
 
 export default function KeypadScreen({ navigation }) {
   const insets = useSafeAreaInsets();
   const [phoneNumber, setPhoneNumber] = useState('');
-  const { contacts, loadContacts } = useContactsStore();
+  const contacts = useContactsStore((state) => state.contacts);
+  const fetchUsers = useContactsStore((state) => state.fetchUsers);
 
   useEffect(() => {
-    loadContacts();
-  }, []);
+    fetchUsers();
+  }, [fetchUsers]);
 
-  const handleKeyPress = (val) => {
-    setPhoneNumber((prev) => prev + val);
+  const handleKeyPress = (key) => {
+    if (phoneNumber.length < 15) {
+      setPhoneNumber((prev) => prev + key);
+    }
   };
 
-  const handleBackspace = () => {
+  const handleDelete = () => {
     setPhoneNumber((prev) => prev.slice(0, -1));
   };
 
-  const handleClear = () => {
+  const handleLongDelete = () => {
     setPhoneNumber('');
   };
 
-  // Filter contacts by entered phone number
-  const matchedContacts = phoneNumber
-    ? (contacts || []).filter((c) => {
-        const cleanDigits = c.number.replace(/\D/g, '');
-        const cleanInput = phoneNumber.replace(/\D/g, '');
-        return cleanDigits.includes(cleanInput) || c.name.toLowerCase().includes(phoneNumber.toLowerCase());
-      })
-    : [];
+  const handleCall = () => {
+    if (!phoneNumber) return;
 
-  const handleCall = (selectedContact) => {
-    const targetContact = selectedContact || {
-      name: phoneNumber || 'Unknown Caller',
-      number: phoneNumber,
-      initials: phoneNumber ? phoneNumber.slice(-2) : 'UC',
-      colors: ['#3B82F6', '#6366F1'],
-    };
+    const matchedContact = contacts.find((c) => {
+      const cleanPhone = (c.phone_number || '').replace(/\D/g, '');
+      const cleanInput = phoneNumber.replace(/\D/g, '');
+      return (
+        (cleanPhone && cleanInput && cleanPhone.includes(cleanInput)) ||
+        (c.email && c.email.toLowerCase() === phoneNumber.trim().toLowerCase())
+      );
+    });
+
+    const targetContact = matchedContact
+      ? {
+          name: matchedContact.name,
+          number: matchedContact.phone_number || matchedContact.email,
+          initials: (matchedContact.name || 'U').substring(0, 2).toUpperCase(),
+          userId: matchedContact.id,
+        }
+      : {
+          name: phoneNumber,
+          number: phoneNumber,
+          initials: 'P',
+          userId: phoneNumber,
+        };
+
     navigation.navigate(ROUTES.OUTGOING_CALL, { contact: targetContact });
   };
 
@@ -78,7 +92,7 @@ export default function KeypadScreen({ navigation }) {
         {/* Header */}
         <View style={styles.header}>
           <TouchableOpacity
-            onPress={() => navigation.goBack()}
+            onPress={() => safeGoBack(navigation, ROUTES.MAIN_TABS)}
             style={styles.backBtn}
             activeOpacity={0.7}
           >

@@ -20,6 +20,7 @@ import Animated, {
 } from 'react-native-reanimated';
 import { ROUTES } from '../../constants/routes';
 import { colors } from '../../theme';
+import { safeGoBack } from '../../utils/navigationHelper';
 
 import { Audio } from 'expo-av';
 import { agoraService } from '../../services/agora/agoraService';
@@ -61,6 +62,7 @@ export default function IncomingCallScreen({ navigation, route }) {
 
   const handleDecline = async () => {
     try {
+      if (callId) agoraService.markCallHandled(callId);
       if (callerUserId && channelName) {
         await agoraService.respondToCallInvitation(callerUserId, 'decline', channelName, callId);
       }
@@ -70,7 +72,7 @@ export default function IncomingCallScreen({ navigation, route }) {
     } catch (e) {
       console.warn('Error declining call:', e);
     }
-    navigation.goBack();
+    safeGoBack(navigation, ROUTES.MAIN_TABS);
   };
 
   const handleAccept = async () => {

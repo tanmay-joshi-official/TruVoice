@@ -15,61 +15,67 @@ import AppInput from '../../components/inputs/AppInput';
 import PrimaryButton from '../../components/buttons/PrimaryButton';
 
 import { ROUTES } from '../../constants/routes';
+import { safeGoBack } from '../../utils/navigationHelper';
 
 export default function ForgotPasswordScreen() {
   const navigation = useNavigation();
 
-  const [email, setEmail] = useState('');
+  const [emailOrPhone, setEmailOrPhone] = useState('');
   const [loading, setLoading] = useState(false);
+  const [errorMsg, setErrorMsg] = useState('');
 
   const sendOTP = async () => {
-    if (!email.trim()) return;
+    if (!emailOrPhone) {
+      setErrorMsg('Please enter your email or phone number');
+      return;
+    }
 
+    setErrorMsg('');
     setLoading(true);
 
-    await new Promise(resolve => setTimeout(resolve, 1000));
-
-    setLoading(false);
-
-    navigation.navigate(ROUTES.OTP);
+    try {
+      // Simulate sending reset OTP
+      setTimeout(() => {
+        setLoading(false);
+        navigation.navigate(ROUTES.OTP, {
+          phone: emailOrPhone,
+          mode: 'reset',
+        });
+      }, 1000);
+    } catch (err) {
+      setErrorMsg(err.message || 'Failed to send OTP');
+      setLoading(false);
+    }
   };
 
   return (
-    <ScreenContainer edges={['top', 'bottom']}>
+    <ScreenContainer scrollable keyboardView edges={['top', 'bottom']}>
       <KeyboardAvoidingView
-        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
         className="flex-1"
       >
         <ScrollView
-          keyboardShouldPersistTaps="handled"
+          contentContainerStyle={{ flexGrow: 1, justifyContent: 'center' }}
+          className="py-6"
           showsVerticalScrollIndicator={false}
-          contentContainerClassName="flex-grow px-6 pt-4 pb-8"
         >
+          <TruVoiceLogo subtitle="Reset your password" />
 
-          <TruVoiceLogo
-            size={44}
-            color="#3B82F6"
-          />
+          {errorMsg ? (
+            <View className="bg-risk-high/10 border border-risk-high/30 rounded-xl p-3 mt-4">
+              <Text className="text-risk-high text-sm text-center">{errorMsg}</Text>
+            </View>
+          ) : null}
 
-          <Text className="mt-6 text-[28px] font-bold text-white">
-            Forgot Password
-          </Text>
-
-          <Text className="mt-2 text-base text-secondary">
-            Enter your registered email address and we'll send you a verification code.
-          </Text>
-
-          <View className="mt-8">
-
+          <View className="mt-6">
             <AppInput
-              label="Email Address"
-              placeholder="you@truvoice.app"
-              value={email}
-              onChangeText={setEmail}
-              keyboardType="email-address"
+              label="Email or Phone Number"
+              placeholder="Enter your registered email or phone"
+              value={emailOrPhone}
+              onChangeText={setEmailOrPhone}
+              autoCapitalize="none"
               leftIcon="email-outline"
             />
-
           </View>
 
           <PrimaryButton
@@ -80,7 +86,7 @@ export default function ForgotPasswordScreen() {
           />
 
           <Pressable
-            onPress={() => navigation.goBack()}
+            onPress={() => safeGoBack(navigation, ROUTES.LOGIN)}
             className="mt-6 self-center"
           >
             <Text className="text-primary font-semibold">

@@ -15,6 +15,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Audio } from 'expo-av';
 import { ROUTES } from '../../constants/routes';
 import { colors } from '../../theme';
+import { safeGoBack } from '../../utils/navigationHelper';
 
 import { agoraService } from '../../services/agora/agoraService';
 import { api } from '../../services/api/client';
@@ -76,7 +77,7 @@ export default function OutgoingCallScreen({ navigation, route }) {
         if (!micGranted) {
           if (isMounted) {
             setCallStatusText('Microphone permission required');
-            setTimeout(() => navigation.goBack(), 2000);
+            setTimeout(() => safeGoBack(navigation, ROUTES.MAIN_TABS), 2000);
           }
           return;
         }
@@ -121,7 +122,7 @@ export default function OutgoingCallScreen({ navigation, route }) {
                 if (isMounted) {
                   setCallStatusText(callDetail.data.status === 'declined' ? 'Call Declined' : 'Call Ended');
                   if (pollInterval) clearInterval(pollInterval);
-                  setTimeout(() => navigation.goBack(), 1500);
+                  setTimeout(() => safeGoBack(navigation, ROUTES.MAIN_TABS), 1500);
                 }
               }
             } catch (e) {
@@ -135,7 +136,7 @@ export default function OutgoingCallScreen({ navigation, route }) {
             setCallStatusText('No Answer');
             if (pollInterval) clearInterval(pollInterval);
             if (loggedCallId) api.updateCallStatus(loggedCallId, 'canceled');
-            setTimeout(() => navigation.goBack(), 1500);
+            setTimeout(() => safeGoBack(navigation, ROUTES.MAIN_TABS), 1500);
           }
         }, 45000);
 
@@ -144,7 +145,7 @@ export default function OutgoingCallScreen({ navigation, route }) {
         if (isMounted) {
           setCallStatusText('Call Failed');
           setTimeout(() => {
-            if (isMounted) navigation.goBack();
+            if (isMounted) safeGoBack(navigation, ROUTES.MAIN_TABS);
           }, 2000);
         }
       }
@@ -167,7 +168,7 @@ export default function OutgoingCallScreen({ navigation, route }) {
         if (String(data.callId) === String(currentCallId) || !data.callId) {
           if (isMounted) {
             setCallStatusText(data.action === 'declined' || data.action === 'decline' ? 'Call Declined' : 'Call Ended');
-            setTimeout(() => navigation.goBack(), 1500);
+            setTimeout(() => safeGoBack(navigation, ROUTES.MAIN_TABS), 1500);
           }
         }
       }
@@ -230,7 +231,7 @@ export default function OutgoingCallScreen({ navigation, route }) {
     } catch (e) {
       console.warn('Error ending outgoing call:', e);
     }
-    navigation.goBack();
+    safeGoBack(navigation, ROUTES.MAIN_TABS);
   };
 
   return (
