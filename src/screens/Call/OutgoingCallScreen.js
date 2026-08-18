@@ -104,9 +104,27 @@ export default function OutgoingCallScreen({ navigation, route }) {
         try {
           const tokenRes = await api.getAgoraToken(channelName);
           const token = tokenRes.data?.token;
-          await agoraService.joinChannel(channelName, token, 0);
+          const joined = await agoraService.joinChannel(channelName, token, 0);
+          if (!joined) {
+            if (loggedCallId) {
+              await api.updateCallStatus(loggedCallId, 'canceled');
+            }
+            if (isMounted) {
+              setCallStatusText('Call setup failed');
+              setTimeout(() => safeGoBack(navigation, ROUTES.MAIN_TABS), 1500);
+            }
+            return;
+          }
         } catch (tokErr) {
           console.warn('Error joining Agora channel on outgoing call:', tokErr);
+          if (loggedCallId) {
+            await api.updateCallStatus(loggedCallId, 'canceled');
+          }
+          if (isMounted) {
+            setCallStatusText('Call setup failed');
+            setTimeout(() => safeGoBack(navigation, ROUTES.MAIN_TABS), 1500);
+          }
+          return;
         }
 
         if (isMounted) setCallStatusText('Ringing...');

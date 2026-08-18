@@ -11,8 +11,13 @@ const envApiUrl =
   process.env.API_URL ||
   process.env.NEXT_PUBLIC_API_URL;
 
+const hostUri = Constants.expoConfig?.hostUri || Constants.manifest?.debuggerHost;
+const inferredHostIp = hostUri ? hostUri.split(':')[0] : null;
+
 const DEFAULT_API_BASE_URL = envApiUrl
   ? envApiUrl
+  : inferredHostIp
+  ? `http://${inferredHostIp}:8000`
   : Platform.OS === 'android'
   ? 'http://10.0.2.2:8000'
   : 'http://localhost:8000';

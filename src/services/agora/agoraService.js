@@ -301,6 +301,15 @@ class AgoraService {
     });
   }
 
+  _computeUid() {
+    const source = String(this.userId || 'truvoice-user-' + Date.now());
+    let hash = 0;
+    for (let i = 0; i < source.length; i += 1) {
+      hash = (hash * 31 + source.charCodeAt(i)) >>> 0;
+    }
+    return (hash % 1000000000) + 1;
+  }
+
   async joinChannel(channelName, token, uid) {
     if (!this.isEngineReady || !this.rtcEngine) {
       console.warn('Cannot join channel: Agora RTC engine not available. Rebuild with expo-dev-client.');
@@ -318,7 +327,15 @@ class AgoraService {
         publishMicrophoneTrack: true,
         autoSubscribeAudio: true,
       };
-      await this.rtcEngine.joinChannel(token, channelName, uid || 0, mediaOptions);
+
+      const resolvedUid = uid ?? this._computeUid();
+      const userAccount = this.userId ? String(this.userId) : `truvoice-${Date.now()}`;
+
+      if (typeof this.rtcEngine.joinChannelWithUserAccount === 'function') {
+        await this.rtcEngine.joinChannelWithUserAccount(token, channelName, userAccount, mediaOptions);
+      } else {
+        await this.rtcEngine.joinChannel(token, channelName, resolvedUid, mediaOptions);
+      }
 
       if (typeof this.rtcEngine.enableAudio === 'function') {
         await this.rtcEngine.enableAudio();
@@ -332,8 +349,11 @@ class AgoraService {
       if (typeof this.rtcEngine.muteAllRemoteAudioStreams === 'function') {
         await this.rtcEngine.muteAllRemoteAudioStreams(false);
       }
+      if (typeof this.rtcEngine.setEnableSpeakerphone === 'function') {
+        await this.rtcEngine.setEnableSpeakerphone(true);
+      }
 
-      console.log(`Joined Agora RTC channel: ${channelName}`);
+      console.log(`Joined Agora RTC channel: ${channelName} using uid/userAccount ${userAccount}`);
       return true;
     } catch (e) {
       console.warn('Error joining Agora RTC channel:', e);

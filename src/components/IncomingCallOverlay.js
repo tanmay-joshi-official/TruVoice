@@ -51,13 +51,19 @@ export default function IncomingCallOverlay() {
       const tokenRes = await api.getAgoraToken(channelName);
       const token = tokenRes.data?.token;
 
-      await agoraService.joinChannel(channelName, token, 0);
+      const joined = await agoraService.joinChannel(channelName, token, 0);
+      if (!joined) {
+        if (callId) {
+          await api.updateCallStatus(callId, 'canceled');
+        }
+        clearIncomingCall();
+        return;
+      }
 
       await agoraService.respondToCallInvitation(callerUserId, 'accept', channelName, callId);
 
       clearIncomingCall();
 
-      // Navigate to Active Call screen
       navigation.navigate(ROUTES.ACTIVE_CALL, {
         contact: {
           name: callerName || 'Incoming Caller',
@@ -70,6 +76,13 @@ export default function IncomingCallOverlay() {
       });
     } catch (err) {
       console.warn('Error accepting incoming call:', err);
+      if (incomingCall.callId) {
+        try {
+          await api.updateCallStatus(incomingCall.callId, 'canceled');
+        } catch (e) {
+          console.warn('Unable to mark failed incoming call as canceled:', e);
+        }
+      }
       clearIncomingCall();
     }
   };

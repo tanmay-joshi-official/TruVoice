@@ -92,7 +92,13 @@ export default function IncomingCallScreen({ navigation, route }) {
       if (channelName) {
         const tokenRes = await api.getAgoraToken(channelName);
         const token = tokenRes.data?.token;
-        await agoraService.joinChannel(channelName, token, 0);
+        const joined = await agoraService.joinChannel(channelName, token, 0);
+        if (!joined) {
+          if (callId) {
+            await api.updateCallStatus(callId, 'canceled');
+          }
+          return;
+        }
       }
 
       if (callerUserId && channelName) {
@@ -102,11 +108,18 @@ export default function IncomingCallScreen({ navigation, route }) {
       if (callId) {
         await api.updateCallStatus(callId, 'answered');
       }
+
+      navigation.replace(ROUTES.ACTIVE_CALL, { contact, callId, channelName });
     } catch (err) {
       console.warn('Error in IncomingCallScreen handleAccept:', err);
+      if (callId) {
+        try {
+          await api.updateCallStatus(callId, 'canceled');
+        } catch (e) {
+          console.warn('Unable to mark failed call as canceled:', e);
+        }
+      }
     }
-
-    navigation.replace(ROUTES.ACTIVE_CALL, { contact, callId, channelName });
   };
 
   const barMultipliers = [0.4, 0.8, 1.2, 0.6, 1.5, 0.9, 1.8, 1.0, 1.4, 0.7, 1.1, 0.5];
