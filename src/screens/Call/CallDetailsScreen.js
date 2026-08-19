@@ -18,6 +18,7 @@ import { ROUTES } from '../../constants/routes';
 import { colors } from '../../theme';
 import { safeGoBack } from '../../utils/navigationHelper';
 import { analysisService } from '../../services/analysis/analysisService';
+import { showAlert } from '../../store/alertStore';
 
 export default function CallDetailsScreen({ navigation, route }) {
   const insets = useSafeAreaInsets();
@@ -69,7 +70,7 @@ export default function CallDetailsScreen({ navigation, route }) {
   }, [loadSpamStatus]);
 
   const handleReportScam = () => {
-    Alert.alert(
+    showAlert(
       'Report as Spam',
       `Report ${callerNumber || 'this number'} as spam to TruVoice threat intelligence?\n\nThis will flag the number for other users.`,
       [
@@ -82,18 +83,21 @@ export default function CallDetailsScreen({ navigation, route }) {
             try {
               const result = await analysisService.reportSpam(callerNumber);
               setSpamStatus(result);
-              Alert.alert(
+              showAlert(
                 'Reported',
                 `Spam report recorded.\nReport count: ${result.report_count}\nMarked spam: ${result.is_spam ? 'Yes' : 'Not yet (needs 20 reports)'}`,
+                [],
+                'success',
               );
             } catch (err) {
-              Alert.alert('Report failed', err.message || 'Could not submit spam report.');
+              showAlert('Report failed', err.message || 'Could not submit spam report.', [], 'danger');
             } finally {
               setReportingSpam(false);
             }
           },
         },
       ],
+      'warning',
     );
   };
 
@@ -111,7 +115,7 @@ export default function CallDetailsScreen({ navigation, route }) {
   };
 
   const handleBlockCaller = () => {
-    Alert.alert(
+    showAlert(
       'Block Caller',
       'Are you sure you want to block this caller? Future calls from this number will be automatically declined.',
       [
@@ -119,9 +123,10 @@ export default function CallDetailsScreen({ navigation, route }) {
         {
           text: 'Block',
           style: 'destructive',
-          onPress: () => Alert.alert('Blocked', 'Caller has been added to your block list.'),
+          onPress: () => showAlert('Blocked', 'Caller has been added to your block list.', [], 'success'),
         },
       ],
+      'danger',
     );
   };
 
@@ -243,7 +248,7 @@ export default function CallDetailsScreen({ navigation, route }) {
                 key={event.id || event.label}
                 activeOpacity={0.7}
                 onPress={() =>
-                  Alert.alert(event.label, `Severity: ${event.type === 'danger' ? 'High — confirmed synthetic/suspicious' : 'Medium — anomalous'}`)
+                  showAlert(event.label, `Severity: ${event.type === 'danger' ? 'High — confirmed synthetic/suspicious' : 'Medium — anomalous'}`, [], event.type === 'danger' ? 'danger' : 'warning')
                 }
                 style={styles.eventRow}
               >

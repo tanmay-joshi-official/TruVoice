@@ -18,6 +18,7 @@ import FloatingCallButton from '../../components/buttons/FloatingCallButton';
 import { ROUTES } from '../../constants/routes';
 import { useSettingsStore } from '../../store/settingsStore';
 import { colors } from '../../theme';
+import { showAlert } from '../../store/alertStore';
 
 export default function SecuritySettingsScreen({ navigation }) {
   const insets = useSafeAreaInsets();
@@ -40,7 +41,7 @@ export default function SecuritySettingsScreen({ navigation }) {
   const [showAddBlockModal, setShowAddBlockModal] = useState(false);
 
   const handleUnblock = (id, number) => {
-    Alert.alert(
+    showAlert(
       'Unblock Number',
       `Unblock ${number}? You will receive calls from this number again.`,
       [
@@ -53,12 +54,13 @@ export default function SecuritySettingsScreen({ navigation }) {
           },
         },
       ],
+      'warning',
     );
   };
 
   const handleAddBlock = () => {
     if (!newBlockNumber.trim()) {
-      Alert.alert('Required', 'Please enter a valid phone number.');
+      showAlert('Required', 'Please enter a valid phone number.', [], 'warning');
       return;
     }
     const newEntry = {
@@ -69,7 +71,7 @@ export default function SecuritySettingsScreen({ navigation }) {
     setBlockedNumbers((prev) => [newEntry, ...prev]);
     setNewBlockNumber('');
     setShowAddBlockModal(false);
-    Alert.alert('Blocked', `${newBlockNumber.trim()} has been added to your blocked list.`);
+    showAlert('Blocked', `${newBlockNumber.trim()} has been added to your blocked list.`, [], 'success');
   };
 
   return (

@@ -18,6 +18,7 @@ import Svg, { Path, Defs, LinearGradient as SvgGradient, Stop } from 'react-nati
 import { ROUTES } from '../../constants/routes';
 import { normalizeAnalysis } from '../../utils/analysisMapper';
 import { colors } from '../../theme';
+import { showAlert } from '../../store/alertStore';
 
 const pickEither = (obj, camelKey, snakeKey, fallback = undefined) => {
   if (obj == null) return fallback;
@@ -118,7 +119,7 @@ export default function CallSummaryScreen({ navigation, route }) {
 
   const handleCopyTranscript = async () => {
     if (transcriptLines.length === 0) {
-      Alert.alert('No Transcript', 'Transcript data is not yet available for this call.');
+      showAlert('No Transcript', 'Transcript data is not yet available for this call.', [], 'info');
       return;
     }
     const transcriptText = transcriptLines
@@ -126,9 +127,9 @@ export default function CallSummaryScreen({ navigation, route }) {
       .join('\n');
     try {
       await Clipboard.setStringAsync(transcriptText);
-      Alert.alert('Copied', 'Full transcript copied to clipboard.');
+      showAlert('Copied', 'Full transcript copied to clipboard.', [], 'success');
     } catch {
-      Alert.alert('Transcript', transcriptText);
+      showAlert('Transcript', transcriptText, [], 'info');
     }
   };
 

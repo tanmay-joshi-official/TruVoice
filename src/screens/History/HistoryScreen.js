@@ -18,6 +18,8 @@ import FloatingCallButton from '../../components/buttons/FloatingCallButton';
 import { ROUTES } from '../../constants/routes';
 import { colors } from '../../theme';
 import { useHistoryStore } from '../../store/historyStore';
+import { useContactsStore } from '../../store/contactsStore';
+import { resolveContactName } from '../../utils/analysisMapper';
 
 const FILTERS = ['All', 'Human', 'AI', 'Suspicious'];
 
@@ -27,7 +29,9 @@ export default function HistoryScreen({ navigation }) {
   const [search, setSearch] = useState('');
   const [refreshing, setRefreshing] = useState(false);
 
-  const { items, isLoading, error, fetchHistory } = useHistoryStore();
+  const { items, isLoading, error, fetchHistory, refreshContactNames } = useHistoryStore();
+  const contacts = useContactsStore((state) => state.contacts);
+  const loadContacts = useContactsStore((state) => state.loadContacts);
 
   const loadHistory = useCallback(async () => {
     try {
@@ -43,6 +47,14 @@ export default function HistoryScreen({ navigation }) {
     }
   }, [items.length, loadHistory]);
 
+  useEffect(() => {
+    refreshContactNames();
+  }, [contacts, refreshContactNames]);
+
+  useEffect(() => {
+    loadContacts().catch(() => {});
+  }, [loadContacts]);
+
   const handleRefresh = async () => {
     setRefreshing(true);
     try {
@@ -52,8 +64,13 @@ export default function HistoryScreen({ navigation }) {
     }
   };
 
-  const filteredItems = items.filter((item) => {
-    const haystack = `${item.name || ''} ${item.number || ''} ${item.callerNumber || ''}`.toLowerCase();
+  const displayItems = items.map((item) => ({
+    ...item,
+    displayName: resolveContactName(item, contacts),
+  }));
+
+  const filteredItems = displayItems.filter((item) => {
+    const haystack = `${item.displayName || ''} ${item.number || ''} ${item.callerNumber || ''}`.toLowerCase();
     const matchesSearch = haystack.includes(search.toLowerCase());
     if (!matchesSearch) return false;
     if (activeFilter === 'All') return true;
@@ -193,7 +210,7 @@ export default function HistoryScreen({ navigation }) {
                         <View style={styles.callInfo}>
                           <View style={styles.callNameRow}>
                             <Text style={styles.callName}>
-                              {item.name || item.callerNumber || item.number || 'Unknown Caller'}
+                              {item.displayName || item.callerNumber || item.number || 'Unknown Caller'}
                             </Text>
                             <View style={[styles.inlineBadge, { backgroundColor: badge.bg }]}>
                               <Text style={[styles.inlineBadgeText, { color: badge.text }]}>

@@ -18,6 +18,8 @@ import { ROUTES } from '../../constants/routes';
 import { useAuthStore, useHistoryStore, useContactsStore } from '../../store';
 import { useSettingsStore } from '../../store/settingsStore';
 import { colors } from '../../theme';
+import { getEffectiveUserName, getEffectiveUserInitials } from '../../utils/userHelper';
+import { showAlert } from '../../store/alertStore';
 
 export default function SettingsScreen({ navigation }) {
   const insets = useSafeAreaInsets();
@@ -29,17 +31,12 @@ export default function SettingsScreen({ navigation }) {
   const aiProtectionEnabled = useSettingsStore((state) => state.aiProtectionEnabled);
 
   // Derive display values from auth store user, with fallbacks
-  const displayName = user?.name || 'TruVoice User';
-  const displayEmail = user?.email || 'Tap to view profile';
-  const initials = displayName
-    .split(' ')
-    .map((w) => w[0])
-    .join('')
-    .toUpperCase()
-    .slice(0, 2) || 'TV';
+  const displayName = getEffectiveUserName(user);
+  const displayEmail = user?.email || `${displayName.toLowerCase().replace(/\s+/g, '.')}@truvoice.app`;
+  const initials = getEffectiveUserInitials(user);
 
   const handleLogout = () => {
-    Alert.alert(
+    showAlert(
       'Sign out',
       'Are you sure you want to sign out of TruVoice?',
       [
@@ -56,6 +53,7 @@ export default function SettingsScreen({ navigation }) {
           },
         },
       ],
+      'danger',
     );
   };
 

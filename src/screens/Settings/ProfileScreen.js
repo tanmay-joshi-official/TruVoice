@@ -20,6 +20,8 @@ import { ROUTES } from '../../constants/routes';
 import { useAuthStore, useHistoryStore, useContactsStore } from '../../store';
 import { colors } from '../../theme';
 import { tokenStorage } from '../../services/storage/tokenStorage';
+import { getEffectiveUserName, getEffectiveUserInitials } from '../../utils/userHelper';
+import { showAlert } from '../../store/alertStore';
 
 export default function ProfileScreen({ navigation }) {
   const insets = useSafeAreaInsets();
@@ -27,24 +29,20 @@ export default function ProfileScreen({ navigation }) {
   const historyItems = useHistoryStore((state) => state.items);
   const contacts = useContactsStore((state) => state.contacts);
 
+  const displayName = getEffectiveUserName(user);
+  const displayEmail = user?.email || `${displayName.toLowerCase().replace(/\s+/g, '.')}@truvoice.app`;
+
   const [isEditing, setIsEditing] = useState(false);
-  const [name, setName] = useState(user?.name || '');
-  const [email, setEmail] = useState(user?.email || '');
+  const [name, setName] = useState(displayName);
+  const [email, setEmail] = useState(displayEmail);
   const [isSaving, setIsSaving] = useState(false);
 
-  const displayName = user?.name || 'TruVoice User';
-  const displayEmail = user?.email || 'No email set';
-  const displayPhone = user?.phone_number || user?.phone || '+1 (555) 019-2834';
-  const initials = (name || displayName)
-    .split(' ')
-    .map((w) => w[0])
-    .join('')
-    .toUpperCase()
-    .slice(0, 2) || 'TV';
+  const displayPhone = user?.phone_number || user?.phone || 'Not set';
+  const initials = getEffectiveUserInitials(user);
 
   const handleSave = async () => {
     if (!name.trim()) {
-      Alert.alert('Required Field', 'Please enter your name.');
+      showAlert('Required Field', 'Please enter your name.', [], 'warning');
       return;
     }
     setIsSaving(true);
@@ -62,9 +60,9 @@ export default function ProfileScreen({ navigation }) {
         await tokenStorage.saveSession(token, updatedUser);
       }
       setIsEditing(false);
-      Alert.alert('Profile Updated', 'Your profile details have been successfully saved.');
+      showAlert('Profile Updated', 'Your profile details have been successfully saved.', [], 'success');
     } catch (err) {
-      Alert.alert('Error', 'Failed to save profile changes.');
+      showAlert('Error', 'Failed to save profile changes.', [], 'danger');
     } finally {
       setIsSaving(false);
     }

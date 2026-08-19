@@ -18,6 +18,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import ScreenContainer from '../../components/layout/ScreenContainer';
 import PrimaryButton from '../../components/buttons/PrimaryButton';
 import { ROUTES } from '../../constants/routes';
+import { showAlert } from '../../store/alertStore';
 import { analysisService } from '../../services/analysis/analysisService';
 import { colors } from '../../theme';
 import { safeGoBack } from '../../utils/navigationHelper';
@@ -61,7 +62,7 @@ export default function ReportScamScreen({ navigation, route }) {
         phoneNumber,
         description.trim(),
       );
-      Alert.alert(
+      showAlert(
         'Complaint submitted',
         `Thank you. Your complaint has been registered.\n\nComplaint ID: ${result.complaint_id?.slice(0, 8) || 'received'}\n\nThis data helps protect other TruVoice users.`,
         [
@@ -72,6 +73,7 @@ export default function ReportScamScreen({ navigation, route }) {
             },
           },
         ],
+        'success',
       );
     } catch (err) {
       setError(err.message || 'Failed to submit complaint. Please try again.');

@@ -28,6 +28,7 @@ import HelpCenterScreen from '../screens/Settings/HelpCenterScreen';
 import AboutScreen from '../screens/Settings/AboutScreen';
 
 import IncomingCallOverlay from '../components/IncomingCallOverlay';
+import AppAlertModal from '../components/modals/AppAlertModal';
 
 const Stack = createNativeStackNavigator();
 
@@ -48,6 +49,7 @@ export default function RootNavigator() {
   return (
     <NavigationContainer theme={navTheme}>
       <IncomingCallOverlay />
+      <AppAlertModal />
       <Stack.Navigator
 
         initialRouteName={ROUTES.SPLASH}

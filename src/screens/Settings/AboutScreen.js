@@ -16,16 +16,17 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import FloatingCallButton from '../../components/buttons/FloatingCallButton';
 import { ROUTES } from '../../constants/routes';
 import { colors } from '../../theme';
+import { showAlert } from '../../store/alertStore';
 
 export default function AboutScreen({ navigation }) {
   const insets = useSafeAreaInsets();
 
   const handleCheckUpdates = () => {
-    Alert.alert('Up to Date', 'TruVoice v1.0.0 is the latest version available.');
+    showAlert('Up to Date', 'TruVoice v1.0.0 is the latest version available.', [], 'info');
   };
 
   const handleOpenLegal = (title, content) => {
-    Alert.alert(title, content);
+    showAlert(title, content, [], 'info');
   };
 
   return (

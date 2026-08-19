@@ -22,6 +22,7 @@ import { useContactsStore } from '../../store/contactsStore';
 import { useAuthStore } from '../../store';
 import { agoraService } from '../../services/agora/agoraService';
 import { colors } from '../../theme';
+import { getEffectiveUserName, getEffectiveUserInitials } from '../../utils/userHelper';
 
 export default function HomeScreen({ navigation }) {
   const insets = useSafeAreaInsets();
@@ -30,13 +31,9 @@ export default function HomeScreen({ navigation }) {
   const user = useAuthStore((s) => s.user);
   const token = useAuthStore((s) => s.token);
 
-  const firstName = (user?.name || 'User').split(' ')[0];
-  const userInitials = (user?.name || 'U')
-    .split(' ')
-    .map((w) => w[0])
-    .join('')
-    .toUpperCase()
-    .slice(0, 2);
+  const displayName = getEffectiveUserName(user);
+  const firstName = displayName.split(' ')[0];
+  const userInitials = getEffectiveUserInitials(user);
 
   useEffect(() => {
     loadContacts();

@@ -18,6 +18,7 @@ import { ROUTES } from '../../constants/routes';
 import { useAuthStore } from '../../store';
 import { colors } from '../../theme';
 import { tokenStorage } from '../../services/storage/tokenStorage';
+import { showAlert } from '../../store/alertStore';
 
 export default function SubscriptionScreen({ navigation }) {
   const insets = useSafeAreaInsets();
@@ -86,7 +87,7 @@ export default function SubscriptionScreen({ navigation }) {
 
   const handleTogglePlan = async (planId) => {
     if (planId === 'free' && isPro) {
-      Alert.alert(
+      showAlert(
         'Cancel Pro Subscription',
         'Are you sure you want to downgrade to TruVoice Free? You will lose real-time AI deepfake detection.',
         [
@@ -100,13 +101,14 @@ export default function SubscriptionScreen({ navigation }) {
               const token = useAuthStore.getState().token;
               if (token) await tokenStorage.saveSession(token, updated);
               setSelectedPlan('free');
-              Alert.alert('Plan Updated', 'Your subscription has been changed to TruVoice Free.');
+              showAlert('Plan Updated', 'Your subscription has been changed to TruVoice Free.', [], 'info');
             },
           },
         ],
+        'danger',
       );
     } else if ((planId === 'pro' || planId === 'family') && !isPro) {
-      Alert.alert(
+      showAlert(
         'Activate TruVoice Pro',
         `Upgrade to ${planId === 'family' ? 'TruVoice Family' : 'TruVoice Pro'} (${billingCycle === 'annual' ? 'Billed annually' : 'Billed monthly'})?`,
         [
@@ -119,10 +121,11 @@ export default function SubscriptionScreen({ navigation }) {
               const token = useAuthStore.getState().token;
               if (token) await tokenStorage.saveSession(token, updated);
               setSelectedPlan(planId);
-              Alert.alert('Congratulations!', 'Your TruVoice Pro protection is now active.');
+              showAlert('Congratulations!', 'Your TruVoice Pro protection is now active.', [], 'success');
             },
           },
         ],
+        'confirm',
       );
     } else {
       setSelectedPlan(planId);

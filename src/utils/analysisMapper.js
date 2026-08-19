@@ -16,6 +16,33 @@ const pickEither = (obj, camelKey, snakeKey, fallback = undefined) => {
   return fallback;
 };
 
+export const normalizePhoneNumber = (value = '') =>
+  String(value).replace(/\D/g, '');
+
+const phoneNumbersMatch = (left, right) => {
+  const normalizedLeft = normalizePhoneNumber(left);
+  const normalizedRight = normalizePhoneNumber(right);
+  if (!normalizedLeft || !normalizedRight) return false;
+  if (normalizedLeft === normalizedRight) return true;
+  if (normalizedLeft.endsWith(normalizedRight) || normalizedRight.endsWith(normalizedLeft)) {
+    return true;
+  }
+  return normalizedLeft.slice(-10) === normalizedRight.slice(-10);
+};
+
+const getCallerNumber = (item = {}) =>
+  item.callerNumber ?? item.caller_number ?? item.number ?? item.phone_number ?? '';
+
+const isGenericCallerName = (value) => {
+  const normalized = String(value || '').trim().toLowerCase();
+  return (
+    !normalized ||
+    /app[-_ ]?to[-_ ]?app/.test(normalized) ||
+    /^(unknown|target|caller)[-_ ]?(caller|user|name)?$/.test(normalized) ||
+    /^(target|caller)[-_ ]?user[-_ ]?name$/.test(normalized)
+  );
+};
+
 export const normalizeAnalysis = (data = {}) => {
   const aiProbability = Math.round(
     pickEither(data, 'aiProbability', 'ai_voice_probability', 0),
@@ -85,12 +112,55 @@ export const normalizeAnalysis = (data = {}) => {
 
 export const mapAnalysisResponse = (data = {}) => normalizeAnalysis(data);
 
-export const mapHistoryItem = (item = {}) => {
+export const resolveContactName = (item = {}, contacts = []) => {
+  const rawName = pickEither(item, 'name', 'caller_name', 'target_user_name', null);
+  const callerNum = getCallerNumber(item);
+
+  const isGeneric =
+    isGenericCallerName(rawName) ||
+    /app[-_]?to[-_]?app/i.test(String(callerNum)) ||
+    phoneNumbersMatch(rawName, callerNum);
+
+  if (!isGeneric && rawName) {
+    return rawName.trim();
+  }
+
+  // Try matching caller number or ID against contacts store
+  if (Array.isArray(contacts) && contacts.length > 0) {
+    const match = contacts.find((c) => {
+      if (!c) return false;
+      const cNum = normalizePhoneNumber(c.number || c.phone_number || c.phone || '');
+      return (
+        phoneNumbersMatch(callerNum, cNum) ||
+        (c.id && String(c.id) === String(callerNum)) ||
+        (c.id && item.target_user_id && String(c.id) === String(item.target_user_id))
+      );
+    });
+    if (match && match.name) {
+      return match.name;
+    }
+  }
+
+  if (callerNum && !/app[-_]?to[-_]?app/i.test(String(callerNum))) {
+    return callerNum;
+  }
+
+  return 'Unknown Caller';
+};
+
+export const mapHistoryItem = (item = {}, contacts = []) => {
   const mapped = mapAnalysisResponse(item);
   const createdAtRaw =
     pickEither(item, 'createdAt', 'created_at') || new Date().toISOString();
   const createdAt = new Date(createdAtRaw);
-  const callerNum = pickEither(item, 'callerNumber', 'caller_number', '') || '';
+  const callerNum = getCallerNumber(item);
+  const resolvedName = resolveContactName(item, contacts);
+  const derivedInitials = resolvedName
+    .split(' ')
+    .map((w) => w[0])
+    .join('')
+    .toUpperCase()
+    .slice(0, 2) || 'UC';
 
   let filterCategory = pickEither(item, 'filterCategory', null);
   if (!filterCategory) {
@@ -120,11 +190,8 @@ export const mapHistoryItem = (item = {}) => {
     ...mapped,
     id: pickEither(item, 'id', 'id', mapped.id),
     number: pickEither(item, 'number', null, callerNum) || callerNum,
-    name: pickEither(item, 'name', null, callerNum || 'Unknown Caller') || callerNum || 'Unknown Caller',
-    initials:
-      pickEither(item, 'initials', null) ||
-      (callerNum || 'UC').replace(/\D/g, '').slice(-2) ||
-      'UC',
+    name: resolvedName,
+    initials: derivedInitials,
     time: pickEither(item, 'time', null, formatTime(createdAt)) || formatTime(createdAt),
     dateLabel:
       pickEither(item, 'dateLabel', null, formatDateLabel(createdAt)) ||

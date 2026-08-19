@@ -55,7 +55,7 @@ export async function fetchDeviceContacts() {
         const phoneNumber =
           c.phoneNumbers && c.phoneNumbers.length > 0
             ? c.phoneNumbers[0].number
-            : '+1 (555) 010-0000';
+            : '';
 
         const palette = GRADIENT_PALETTES[index % GRADIENT_PALETTES.length];
 

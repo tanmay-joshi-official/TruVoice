@@ -16,6 +16,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import FloatingCallButton from '../../components/buttons/FloatingCallButton';
 import { ROUTES } from '../../constants/routes';
 import { colors } from '../../theme';
+import { showAlert } from '../../store/alertStore';
 
 export default function HelpCenterScreen({ navigation }) {
   const insets = useSafeAreaInsets();
@@ -72,7 +73,7 @@ export default function HelpCenterScreen({ navigation }) {
 
   const handleSendSupport = () => {
     if (!supportSubject.trim() || !supportMessage.trim()) {
-      Alert.alert('Incomplete Form', 'Please provide both a subject and a message description.');
+      showAlert('Incomplete Form', 'Please provide both a subject and a message description.', [], 'warning');
       return;
     }
     setIsSubmitting(true);
@@ -81,9 +82,11 @@ export default function HelpCenterScreen({ navigation }) {
       setShowContactForm(false);
       setSupportSubject('');
       setSupportMessage('');
-      Alert.alert(
+      showAlert(
         'Ticket Submitted',
         'Thank you! Your support ticket has been received. Our team will review your inquiry shortly.',
+        [],
+        'success',
       );
     }, 1000);
   };
