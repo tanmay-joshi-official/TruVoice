@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import {
   View,
   Text,
@@ -11,6 +11,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Audio } from 'expo-av';
 import { useCallStore } from '../store/callStore';
+import { useHistoryStore } from '../store/historyStore';
 import { agoraService } from '../services/agora/agoraService';
 import { api } from '../services/api/client';
 import { useNavigation } from '@react-navigation/native';
@@ -22,6 +23,31 @@ export default function IncomingCallOverlay() {
   const clearIncomingCall = useCallStore((s) => s.clearIncomingCall);
   const setCallId = useCallStore((s) => s.setCallId);
   const setChannelName = useCallStore((s) => s.setChannelName);
+
+  useEffect(() => {
+    if (!incomingCall?.callId) return undefined;
+
+    const timeout = setTimeout(async () => {
+      const currentCall = useCallStore.getState().incomingCall;
+      if (!currentCall || String(currentCall.callId) !== String(incomingCall.callId)) return;
+
+      try {
+        await api.updateCallStatus(incomingCall.callId, 'no-answer');
+        useHistoryStore.getState().addMissedCall({
+          callId: incomingCall.callId,
+          callerName: incomingCall.callerName,
+          callerNumber: incomingCall.callerNumber || 'App-to-App Call',
+          callerUserId: incomingCall.callerUserId,
+        });
+      } catch (error) {
+        console.warn('Unable to mark unanswered incoming call:', error);
+      } finally {
+        clearIncomingCall();
+      }
+    }, 45000);
+
+    return () => clearTimeout(timeout);
+  }, [incomingCall, clearIncomingCall]);
 
   if (!incomingCall) return null;
 
@@ -81,6 +107,12 @@ export default function IncomingCallOverlay() {
       if (incomingCall.callId) {
         try {
           await api.updateCallStatus(incomingCall.callId, 'canceled');
+          useHistoryStore.getState().addMissedCall({
+            callId: incomingCall.callId,
+            callerName: incomingCall.callerName,
+            callerNumber: 'App-to-App Call',
+            callerUserId: incomingCall.callerUserId,
+          });
         } catch (e) {
           console.warn('Unable to mark failed incoming call as canceled:', e);
         }
@@ -91,11 +123,17 @@ export default function IncomingCallOverlay() {
 
   const handleDecline = async () => {
     try {
-      const { channelName, callerUserId, callId } = incomingCall;
+      const { channelName, callerUserId, callId, callerName } = incomingCall;
       if (callId) agoraService.markCallHandled(callId);
       await agoraService.respondToCallInvitation(callerUserId, 'decline', channelName, callId);
       if (callId) {
         await api.updateCallStatus(callId, 'declined');
+        useHistoryStore.getState().addMissedCall({
+          callId,
+          callerName,
+          callerNumber: 'App-to-App Call',
+          callerUserId,
+        });
       }
     } catch (err) {
       console.warn('Error declining call:', err);

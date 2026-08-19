@@ -1,4 +1,5 @@
 import { formatDateLabel, formatTime } from './formatters';
+import { useAuthStore } from '../store/authStore';
 
 const normalizeRiskLevel = (riskLevel = '') => {
   const value = String(riskLevel).toLowerCase();
@@ -162,7 +163,20 @@ export const mapHistoryItem = (item = {}, contacts = []) => {
     .toUpperCase()
     .slice(0, 2) || 'UC';
 
+  const rawStatus = pickEither(item, 'status', 'status', '');
+  const isMissed = ['missed', 'no-answer', 'no_answer', 'declined', 'canceled'].includes(
+    String(rawStatus).toLowerCase(),
+  );
+
+  const currentUser = useAuthStore.getState().user;
+  const isIncoming = currentUser && item.target_user_id && String(item.target_user_id) === String(currentUser.id);
+  const isOutgoing = !isIncoming;
+
   let filterCategory = pickEither(item, 'filterCategory', null);
+  if (isMissed) {
+    filterCategory = 'Missed';
+  }
+
   if (!filterCategory) {
     filterCategory = 'Human';
     if (mapped.aiProbability > 60) filterCategory = 'AI';
@@ -173,18 +187,24 @@ export const mapHistoryItem = (item = {}, contacts = []) => {
 
   const badge =
     pickEither(item, 'badge', null) ||
-    (mapped.aiProbability > 60
-      ? 'AI'
-      : mapped.aiProbability > 30
-        ? 'Suspicious'
-        : 'Human');
+    (isMissed
+      ? (isOutgoing ? 'Not Answered' : 'Missed')
+      : mapped.aiProbability > 60
+        ? 'AI'
+        : mapped.aiProbability > 30
+          ? 'Suspicious'
+          : 'Human');
   const badgeColor =
     pickEither(item, 'badgeColor', null) ||
-    (mapped.aiProbability > 60
-      ? '#EF4444'
-      : mapped.aiProbability > 30
-        ? '#F59E0B'
-        : '#22C55E');
+    (isMissed
+      ? (isOutgoing ? '#71717A' : '#EF4444')
+      : mapped.aiProbability > 60
+        ? '#EF4444'
+        : mapped.aiProbability > 30
+          ? '#F59E0B'
+          : '#22C55E');
+
+  const scamCategory = pickEither(item, 'scamCategory', 'scam_category', '') || '';
 
   return {
     ...mapped,
@@ -201,9 +221,11 @@ export const mapHistoryItem = (item = {}, contacts = []) => {
       formatDateLabel(createdAt),
     duration: pickEither(item, 'duration', null, '--') || '--',
     filterCategory,
+    scamCategory: scamCategory || (isMissed ? (isOutgoing ? 'Not Answered' : 'Missed Call') : ''),
     aiExplanation: pickEither(item, 'aiExplanation', null, mapped.reasoning) || mapped.reasoning,
     badge,
     badgeColor,
+    status: rawStatus,
   };
 };
 

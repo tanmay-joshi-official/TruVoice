@@ -20,6 +20,10 @@ export default function RecentCallList({ onSelectCall, onHistoryPress }) {
   }, [isAuthenticated, items.length, fetchHistory]);
 
   const getBadgeStyle = (item) => {
+    if (item.badge) {
+      const bg = item.badgeColor ? `${item.badgeColor}22` : 'rgba(255,255,255,0.08)';
+      return { bg, text: item.badgeColor || '#FFFFFF', label: item.badge };
+    }
     if (item.aiProbability > 60) {
       return { bg: 'rgba(239, 68, 68, 0.15)', text: '#EF4444', label: 'AI' };
     }
@@ -76,7 +80,7 @@ export default function RecentCallList({ onSelectCall, onHistoryPress }) {
                     <Text style={[styles.badgeText, { color: badge.text }]}>{badge.label}</Text>
                   </View>
                   <Text style={styles.callTime}>
-                    {item.unifiedRiskScore > 0 ? `${item.unifiedRiskScore}%` : '--'}
+                    {item.filterCategory === 'Missed' ? '--' : (item.unifiedRiskScore > 0 ? `${item.unifiedRiskScore}%` : '--')}
                   </Text>
                 </View>
               </TouchableOpacity>

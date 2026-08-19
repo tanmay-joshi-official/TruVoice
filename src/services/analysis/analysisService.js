@@ -35,7 +35,9 @@ export const analysisService = {
         ...analysisItems,
         ...voiceItems.map((v) => ({
           id: v.id,
-          caller_number: v.phone_number,
+          caller_number: v.phone_number || v.caller_number,
+          target_user_id: v.target_user_id,
+          target_user_name: v.target_user_name || v.caller_name,
           file_name: `Voice Call (${v.duration || 0}s)`,
           transcript: v.transcript,
           ai_voice_probability: v.is_ai_voice ? 90.0 : 10.0,
@@ -46,6 +48,8 @@ export const analysisService = {
           flagged_keywords: v.signals || [],
           reasoning: v.transcript ? `Call transcript: ${v.transcript.substring(0, 100)}...` : 'Real-time phone call',
           created_at: v.created_at,
+          status: v.status || '',
+          duration: v.duration || 0,
         })),
       ].sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
 

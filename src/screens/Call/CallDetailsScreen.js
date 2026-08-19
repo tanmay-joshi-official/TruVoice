@@ -130,7 +130,12 @@ export default function CallDetailsScreen({ navigation, route }) {
     );
   };
 
+  const isMissed = call.filterCategory === 'Missed' || scamCategory === 'Missed Call' || scamCategory === 'Missed' || scamCategory === 'Not Answered';
+  const missedLabel = call.badge || (scamCategory === 'Not Answered' ? 'NOT ANSWERED' : 'MISSED');
+  const missedColor = call.badgeColor || '#71717A';
+
   const getRiskColor = () => {
+    if (isMissed) return missedColor;
     if (unifiedRiskScore > 60) return '#EF4444';
     if (unifiedRiskScore > 30) return '#F59E0B';
     return '#22C55E';
@@ -169,12 +174,12 @@ export default function CallDetailsScreen({ navigation, route }) {
             {callerNumber ? <Text style={styles.callerNumber}>{callerNumber}</Text> : null}
             <View style={[styles.riskBadge, { backgroundColor: `${getRiskColor()}22`, borderColor: `${getRiskColor()}55` }]}>
               <Ionicons
-                name={unifiedRiskScore > 60 ? 'warning' : unifiedRiskScore > 30 ? 'alert-circle' : 'shield-checkmark'}
+                name={isMissed ? 'call-outline' : (unifiedRiskScore > 60 ? 'warning' : unifiedRiskScore > 30 ? 'alert-circle' : 'shield-checkmark')}
                 size={14}
                 color={getRiskColor()}
                 style={{ marginRight: 6 }}
               />
-              <Text style={[styles.riskBadgeText, { color: getRiskColor() }]}>{riskLevelLabel}</Text>
+              <Text style={[styles.riskBadgeText, { color: getRiskColor() }]}>{isMissed ? missedLabel.toUpperCase() : riskLevelLabel}</Text>
             </View>
 
             {spamLoading ? (
@@ -196,118 +201,134 @@ export default function CallDetailsScreen({ navigation, route }) {
             ) : null}
           </View>
 
-          <View style={styles.gaugeSection}>
-            <View style={[styles.gaugeCircle, {
-              borderColor: getRiskColor(),
-              borderTopColor: 'rgba(255,255,255,0.1)',
-              borderRightColor: 'rgba(255,255,255,0.1)',
-            }]}>
-              <Text style={[styles.gaugeLabel, { color: getRiskColor() }]}>AUTHENTICITY</Text>
-              <Text style={[styles.gaugeValue, { color: getRiskColor() }]}>
-                {typeof authenticityScore === 'number' ? `${authenticityScore}%` : authenticityScore}
-              </Text>
-              <Text style={[styles.gaugeSub, { color: getRiskColor() }]}>
-                {typeof authenticityScore === 'number' && authenticityScore < 40
-                  ? 'AI Detected'
-                  : typeof authenticityScore === 'number' && authenticityScore < 70
-                    ? 'Suspicious'
-                    : 'Likely Human'}
-              </Text>
-            </View>
-          </View>
+          {!isMissed && (
+            <>
+              <View style={styles.gaugeSection}>
+                <View style={[styles.gaugeCircle, {
+                  borderColor: getRiskColor(),
+                  borderTopColor: 'rgba(255,255,255,0.1)',
+                  borderRightColor: 'rgba(255,255,255,0.1)',
+                }]}>
+                  <Text style={[styles.gaugeLabel, { color: getRiskColor() }]}>AUTHENTICITY</Text>
+                  <Text style={[styles.gaugeValue, { color: getRiskColor() }]}>
+                    {typeof authenticityScore === 'number' ? `${authenticityScore}%` : authenticityScore}
+                  </Text>
+                  <Text style={[styles.gaugeSub, { color: getRiskColor() }]}>
+                    {typeof authenticityScore === 'number' && authenticityScore < 40
+                      ? 'AI Detected'
+                      : typeof authenticityScore === 'number' && authenticityScore < 70
+                        ? 'Suspicious'
+                        : 'Likely Human'}
+                  </Text>
+                </View>
+              </View>
 
-          <View style={styles.metricsRow}>
-            <View style={styles.metricCard}>
-              <Text style={styles.metricLabel}>AI PROBABILITY</Text>
-              <Text style={[styles.metricValue, { color: aiProbability > 50 ? '#EF4444' : '#22C55E' }]}>
-                {aiProbability}%
-              </Text>
-            </View>
-            <View style={styles.metricCard}>
-              <Text style={styles.metricLabel}>RISK SCORE</Text>
-              <Text style={[styles.metricValue, { color: getRiskColor() }]}>
-                {unifiedRiskScore}%
-              </Text>
-            </View>
-          </View>
+              <View style={styles.metricsRow}>
+                <View style={styles.metricCard}>
+                  <Text style={styles.metricLabel}>AI PROBABILITY</Text>
+                  <Text style={[styles.metricValue, { color: aiProbability > 50 ? '#EF4444' : '#22C55E' }]}>
+                    {aiProbability}%
+                  </Text>
+                </View>
+                <View style={styles.metricCard}>
+                  <Text style={styles.metricLabel}>RISK SCORE</Text>
+                  <Text style={[styles.metricValue, { color: getRiskColor() }]}>
+                    {unifiedRiskScore}%
+                  </Text>
+                </View>
+              </View>
+            </>
+          )}
 
-          {scamCategory ? (
+          {isMissed || scamCategory ? (
             <View
               style={[
                 styles.categoryCard,
                 {
-                  backgroundColor: scamCategory === 'Standard Call' ? 'rgba(34, 197, 94, 0.08)' : (unifiedRiskScore > 60 ? 'rgba(239, 68, 68, 0.08)' : 'rgba(245, 158, 11, 0.08)'),
-                  borderColor: scamCategory === 'Standard Call' ? 'rgba(34, 197, 94, 0.2)' : (unifiedRiskScore > 60 ? 'rgba(239, 68, 68, 0.2)' : 'rgba(245, 158, 11, 0.2)'),
+                  backgroundColor: isMissed ? `${missedColor}14` : (scamCategory === 'Standard Call' ? 'rgba(34, 197, 94, 0.08)' : (unifiedRiskScore > 60 ? 'rgba(239, 68, 68, 0.08)' : 'rgba(245, 158, 11, 0.08)')),
+                  borderColor: isMissed ? `${missedColor}33` : (scamCategory === 'Standard Call' ? 'rgba(34, 197, 94, 0.2)' : (unifiedRiskScore > 60 ? 'rgba(239, 68, 68, 0.2)' : 'rgba(245, 158, 11, 0.2)')),
                 }
               ]}
             >
               <Ionicons
-                name={scamCategory === 'Standard Call' ? 'shield-checkmark-outline' : 'alert'}
+                name={isMissed ? 'call-outline' : (scamCategory === 'Standard Call' ? 'shield-checkmark-outline' : 'alert')}
                 size={18}
-                color={scamCategory === 'Standard Call' ? '#22C55E' : (unifiedRiskScore > 60 ? '#EF4444' : '#F59E0B')}
+                color={isMissed ? missedColor : (scamCategory === 'Standard Call' ? '#22C55E' : (unifiedRiskScore > 60 ? '#EF4444' : '#F59E0B'))}
                 style={{ marginRight: 8 }}
               />
               <View style={{ flex: 1 }}>
                 <Text style={styles.categoryLabel}>
-                  {scamCategory === 'Standard Call' ? 'Call Verification Status' : 'Detected Scam Category'}
+                  {isMissed ? 'Call Status' : (scamCategory === 'Standard Call' ? 'Call Verification Status' : 'Detected Scam Category')}
                 </Text>
                 <Text
                   style={[
                     styles.categoryValue,
-                    { color: scamCategory === 'Standard Call' ? '#22C55E' : (unifiedRiskScore > 60 ? '#EF4444' : '#F59E0B') }
+                    { color: isMissed ? missedColor : (scamCategory === 'Standard Call' ? '#22C55E' : (unifiedRiskScore > 60 ? '#EF4444' : '#F59E0B')) }
                   ]}
                 >
-                  {scamCategory === 'Standard Call' ? 'Secure Call (No Scam Detected)' : scamCategory}
+                  {isMissed ? missedLabel : (scamCategory === 'Standard Call' ? 'Secure Call (No Scam Detected)' : scamCategory)}
                 </Text>
               </View>
             </View>
           ) : null}
-
-          <Text style={styles.sectionTitle}>Risk events</Text>
-          <View style={styles.card}>
-            {riskEvents.length > 0 ? riskEvents.map((event) => (
-              <TouchableOpacity
-                key={event.id || event.label}
-                activeOpacity={0.7}
-                onPress={() =>
-                  showAlert(event.label, `Severity: ${event.type === 'danger' ? 'High — confirmed synthetic/suspicious' : 'Medium — anomalous'}`, [], event.type === 'danger' ? 'danger' : 'warning')
-                }
-                style={styles.eventRow}
-              >
-                <View
-                  style={[
-                    styles.dot,
-                    { backgroundColor: event.type === 'danger' ? '#EF4444' : '#F59E0B' },
-                  ]}
-                />
-                <Text style={styles.eventTime}>{event.time || '--:--'}</Text>
-                <Text style={styles.eventLabel}>{event.label}</Text>
-              </TouchableOpacity>
-            )) : (
-              <Text style={{ color: colors.textMuted, fontSize: 13, textAlign: 'center' }}>No risk events detected</Text>
-            )}
-          </View>
-
-          {Array.isArray(transcriptLines) && transcriptLines.length > 0 ? (
+          {isMissed ? (
             <>
-              <Text style={styles.sectionTitle}>Transcript</Text>
+              <Text style={styles.sectionTitle}>Call Details</Text>
               <View style={styles.card}>
-                {transcriptLines.map((line, idx) => (
-                  <View key={line.id || idx} style={{ flexDirection: 'row', marginVertical: 4 }}>
-                    <Text style={styles.tsTime}>{typeof line === 'object' && line.time ? line.time : '--:--'}</Text>
-                    <Text style={styles.tsText}>{typeof line === 'object' ? (line.text || line.line || '') : String(line)}</Text>
-                  </View>
-                ))}
+                <Text style={styles.explanationText}>
+                  No real-time voice analysis, risk scoring, keyword warnings, or call transcripts are available for this record. The call was missed, declined, or canceled before it could connect to the secure TruVoice RTC audio channel.
+                </Text>
               </View>
             </>
-          ) : null}
+          ) : (
+            <>
+              <Text style={styles.sectionTitle}>Risk events</Text>
+              <View style={styles.card}>
+                {riskEvents.length > 0 ? riskEvents.map((event) => (
+                  <TouchableOpacity
+                    key={event.id || event.label}
+                    activeOpacity={0.7}
+                    onPress={() =>
+                      showAlert(event.label, `Severity: ${event.type === 'danger' ? 'High — confirmed synthetic/suspicious' : 'Medium — anomalous'}`, [], event.type === 'danger' ? 'danger' : 'warning')
+                    }
+                    style={styles.eventRow}
+                  >
+                    <View
+                      style={[
+                        styles.dot,
+                        { backgroundColor: event.type === 'danger' ? '#EF4444' : '#F59E0B' },
+                      ]}
+                    />
+                    <Text style={styles.eventTime}>{event.time || '--:--'}</Text>
+                    <Text style={styles.eventLabel}>{event.label}</Text>
+                  </TouchableOpacity>
+                )) : (
+                  <Text style={{ color: colors.textMuted, fontSize: 13, textAlign: 'center' }}>No risk events detected</Text>
+                )}
+              </View>
 
-          <Text style={styles.sectionTitle}>AI explanation</Text>
-          <View style={styles.card}>
-            <Text style={styles.explanationText}>
-              {aiExplanation || 'AI analysis explanation is not available for this call.'}
-            </Text>
-          </View>
+              {Array.isArray(transcriptLines) && transcriptLines.length > 0 ? (
+                <>
+                  <Text style={styles.sectionTitle}>Transcript</Text>
+                  <View style={styles.card}>
+                    {transcriptLines.map((line, idx) => (
+                      <View key={line.id || idx} style={{ flexDirection: 'row', marginVertical: 4 }}>
+                        <Text style={styles.tsTime}>{typeof line === 'object' && line.time ? line.time : '--:--'}</Text>
+                        <Text style={styles.tsText}>{typeof line === 'object' ? (line.text || line.line || '') : String(line)}</Text>
+                      </View>
+                    ))}
+                  </View>
+                </>
+              ) : null}
+
+              <Text style={styles.sectionTitle}>AI explanation</Text>
+              <View style={styles.card}>
+                <Text style={styles.explanationText}>
+                  {aiExplanation || 'AI analysis explanation is not available for this call.'}
+                </Text>
+              </View>
+            </>
+          )}
 
           <View style={styles.actionsRow}>
             <TouchableOpacity
