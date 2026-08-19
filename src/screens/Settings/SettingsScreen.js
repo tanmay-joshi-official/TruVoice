@@ -15,7 +15,8 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import FloatingCallButton from '../../components/buttons/FloatingCallButton';
 import { ROUTES } from '../../constants/routes';
-import { useAuthStore } from '../../store';
+import { useAuthStore, useHistoryStore, useContactsStore } from '../../store';
+import { useSettingsStore } from '../../store/settingsStore';
 import { colors } from '../../theme';
 
 export default function SettingsScreen({ navigation }) {
@@ -23,15 +24,19 @@ export default function SettingsScreen({ navigation }) {
   const user = useAuthStore((state) => state.user);
   const logout = useAuthStore((state) => state.logout);
 
+  const historyItems = useHistoryStore((state) => state.items);
+  const contacts = useContactsStore((state) => state.contacts);
+  const aiProtectionEnabled = useSettingsStore((state) => state.aiProtectionEnabled);
+
   // Derive display values from auth store user, with fallbacks
   const displayName = user?.name || 'TruVoice User';
-  const displayEmail = user?.email || '';
+  const displayEmail = user?.email || 'Tap to view profile';
   const initials = displayName
     .split(' ')
     .map((w) => w[0])
     .join('')
     .toUpperCase()
-    .slice(0, 2);
+    .slice(0, 2) || 'TV';
 
   const handleLogout = () => {
     Alert.alert(
@@ -54,16 +59,24 @@ export default function SettingsScreen({ navigation }) {
     );
   };
 
+  const handleProfile = () => {
+    navigation.navigate(ROUTES.PROFILE);
+  };
+
   const handleSubscription = () => {
-    Alert.alert('Subscription', 'No active subscription.\n\nSubscription plans will be available once the backend is connected.');
+    navigation.navigate(ROUTES.SUBSCRIPTION);
   };
 
   const handleSecuritySettings = () => {
-    Alert.alert('Security Settings', 'End-to-end encryption: Active\nWebRTC transport: Secured\nOn-device AI analysis: Enabled\n\nDetailed security configuration will be available when the backend is connected.');
+    navigation.navigate(ROUTES.SECURITY_SETTINGS);
   };
 
   const handleHelpCenter = () => {
-    Alert.alert('Help Center', 'TruVoice v1.0.0\n\nFor support, contact:\nsupport@truvoice.app\n\nDocumentation and FAQs will be available in a future update.');
+    navigation.navigate(ROUTES.HELP_CENTER);
+  };
+
+  const handleAbout = () => {
+    navigation.navigate(ROUTES.ABOUT);
   };
 
   return (
@@ -87,8 +100,8 @@ export default function SettingsScreen({ navigation }) {
             { paddingBottom: Math.max(insets.bottom + 110, 120) },
           ]}
         >
-          {/* User Card */}
-          <View style={styles.userCard}>
+          {/* User Card — Clickable to open Profile Screen */}
+          <TouchableOpacity activeOpacity={0.8} onPress={handleProfile} style={styles.userCard}>
             <View style={styles.avatarWrapper}>
               <LinearGradient colors={['#3B82F6', '#6366F1']} style={styles.avatarGradient}>
                 <Text style={styles.avatarText}>{initials}</Text>
@@ -96,13 +109,19 @@ export default function SettingsScreen({ navigation }) {
               <View style={styles.avatarRing} />
             </View>
 
-            <Text style={styles.userName}>{displayName}</Text>
-            <Text style={styles.userEmail}>{displayEmail}</Text>
+            <View style={styles.userInfoWrap}>
+              <Text style={styles.userName}>{displayName}</Text>
+              <Text style={styles.userEmail}>{displayEmail}</Text>
+              <View style={styles.viewProfileBtn}>
+                <Text style={styles.viewProfileText}>View & Edit Profile</Text>
+                <Ionicons name="chevron-forward" size={14} color="#3B82F6" />
+              </View>
+            </View>
 
-            {/* Stats Row — populated from backend once connected */}
+            {/* Stats Row */}
             <View style={styles.statsRow}>
               <View style={styles.statItem}>
-                <Text style={styles.statNumber}>0</Text>
+                <Text style={styles.statNumber}>{contacts.length}</Text>
                 <Text style={styles.statLabel}>Trusted</Text>
               </View>
               <View style={styles.statDivider} />
@@ -112,13 +131,13 @@ export default function SettingsScreen({ navigation }) {
               </View>
               <View style={styles.statDivider} />
               <View style={styles.statItem}>
-                <Text style={styles.statNumber}>0h</Text>
-                <Text style={styles.statLabel}>Protected</Text>
+                <Text style={styles.statNumber}>{historyItems.length}</Text>
+                <Text style={styles.statLabel}>Analyzed</Text>
               </View>
             </View>
-          </View>
+          </TouchableOpacity>
 
-          {/* Achievements Section — unlocked via backend when milestones are reached */}
+          {/* Achievements Section */}
           <Text style={styles.sectionTitle}>Achievements</Text>
           <View style={styles.emptyAchievements}>
             <Ionicons name="ribbon-outline" size={28} color={colors.textMuted} style={{ marginBottom: 8 }} />
@@ -135,7 +154,9 @@ export default function SettingsScreen({ navigation }) {
                 </View>
                 <View>
                   <Text style={styles.menuTitle}>Subscription</Text>
-                  <Text style={styles.menuSubtitle}>No active plan</Text>
+                  <Text style={styles.menuSubtitle}>
+                    {user?.isPro ? 'TruVoice Pro Active' : 'TruVoice Free Plan'}
+                  </Text>
                 </View>
               </View>
               <Ionicons name="chevron-forward" size={18} color={colors.textMuted} />
@@ -150,7 +171,9 @@ export default function SettingsScreen({ navigation }) {
                 </View>
                 <View>
                   <Text style={styles.menuTitle}>Security settings</Text>
-                  <Text style={styles.menuSubtitle}>Encryption, permissions</Text>
+                  <Text style={styles.menuSubtitle}>
+                    {aiProtectionEnabled ? 'Protection Active' : 'Protection Paused'}
+                  </Text>
                 </View>
               </View>
               <Ionicons name="chevron-forward" size={18} color={colors.textMuted} />
@@ -166,6 +189,21 @@ export default function SettingsScreen({ navigation }) {
                 <View>
                   <Text style={styles.menuTitle}>Help center</Text>
                   <Text style={styles.menuSubtitle}>FAQ, support, docs</Text>
+                </View>
+              </View>
+              <Ionicons name="chevron-forward" size={18} color={colors.textMuted} />
+            </TouchableOpacity>
+
+            <View style={styles.rowDivider} />
+
+            <TouchableOpacity activeOpacity={0.7} onPress={handleAbout} style={styles.menuItem}>
+              <View style={styles.menuLeft}>
+                <View style={styles.menuIconBox}>
+                  <Ionicons name="information-circle-outline" size={20} color="#A855F7" />
+                </View>
+                <View>
+                  <Text style={styles.menuTitle}>About & Legal</Text>
+                  <Text style={styles.menuSubtitle}>v1.0.0 (Latest)</Text>
                 </View>
               </View>
               <Ionicons name="chevron-forward" size={18} color={colors.textMuted} />
@@ -261,6 +299,9 @@ const styles = StyleSheet.create({
     borderWidth: 2,
     borderColor: '#22C55E',
   },
+  userInfoWrap: {
+    alignItems: 'center',
+  },
   userName: {
     color: '#FFFFFF',
     fontSize: 22,
@@ -270,6 +311,21 @@ const styles = StyleSheet.create({
     color: colors.textSecondary,
     fontSize: 13,
     marginTop: 2,
+  },
+  viewProfileBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: 6,
+    backgroundColor: 'rgba(59, 130, 246, 0.12)',
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 10,
+  },
+  viewProfileText: {
+    color: '#3B82F6',
+    fontSize: 12,
+    fontWeight: '600',
+    marginRight: 4,
   },
   statsRow: {
     flexDirection: 'row',
@@ -304,11 +360,6 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '700',
     marginBottom: 12,
-  },
-  achievementsRow: {
-    flexDirection: 'row',
-    gap: 10,
-    marginBottom: 20,
   },
   emptyAchievements: {
     backgroundColor: '#131316',

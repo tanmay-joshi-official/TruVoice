@@ -40,7 +40,12 @@ export default function CallDetailsScreen({ navigation, route }) {
   const callDuration = call.duration || '--';
   const callName = call.name || call.callerNumber || call.number || 'Unknown Caller';
   const initials = call.initials || (call.callerNumber || call.number || 'UC').replace(/\D/g, '').slice(-2) || 'UC';
-  const transcript = call.transcript || call.transcriptLines || [];
+  const rawTranscript = call.transcriptLines || call.transcript || [];
+  const transcriptLines = Array.isArray(rawTranscript)
+    ? rawTranscript
+    : typeof rawTranscript === 'string' && rawTranscript.trim()
+      ? rawTranscript.split('\n').filter(Boolean).map((text, idx) => ({ id: `line-${idx}`, time: '--:--', text: text.trim() }))
+      : [];
 
   const [spamStatus, setSpamStatus] = useState(null);
   const [spamLoading, setSpamLoading] = useState(false);
@@ -256,14 +261,14 @@ export default function CallDetailsScreen({ navigation, route }) {
             )}
           </View>
 
-          {transcript && transcript.length > 0 ? (
+          {Array.isArray(transcriptLines) && transcriptLines.length > 0 ? (
             <>
               <Text style={styles.sectionTitle}>Transcript</Text>
               <View style={styles.card}>
-                {transcript.map((line, idx) => (
-                  <View key={idx} style={{ flexDirection: 'row', marginVertical: 4 }}>
-                    <Text style={styles.tsTime}>{line.time || '--:--'}</Text>
-                    <Text style={styles.tsText}>{line.text || line}</Text>
+                {transcriptLines.map((line, idx) => (
+                  <View key={line.id || idx} style={{ flexDirection: 'row', marginVertical: 4 }}>
+                    <Text style={styles.tsTime}>{typeof line === 'object' && line.time ? line.time : '--:--'}</Text>
+                    <Text style={styles.tsText}>{typeof line === 'object' ? (line.text || line.line || '') : String(line)}</Text>
                   </View>
                 ))}
               </View>
