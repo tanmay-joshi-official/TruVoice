@@ -209,7 +209,7 @@ export default function HistoryScreen({ navigation }) {
                         </View>
                         <View style={styles.callInfo}>
                           <View style={styles.callNameRow}>
-                            <Text style={styles.callName}>
+                            <Text style={styles.callName} numberOfLines={1} ellipsizeMode="tail">
                               {item.displayName || item.callerNumber || item.number || 'Unknown Caller'}
                             </Text>
                             <View style={[styles.inlineBadge, { backgroundColor: badge.bg }]}>
@@ -222,7 +222,14 @@ export default function HistoryScreen({ navigation }) {
                             {item.callerNumber || item.number || 'Unknown number'}
                           </Text>
                           {item.scamCategory ? (
-                            <Text style={styles.scamCategory}>{item.scamCategory}</Text>
+                            <Text
+                              style={[
+                                styles.scamCategory,
+                                { color: item.scamCategory === 'Standard Call' ? '#22C55E' : (item.unifiedRiskScore > 60 ? '#EF4444' : '#F59E0B') }
+                              ]}
+                            >
+                              {item.scamCategory === 'Standard Call' ? 'Secure Call' : item.scamCategory}
+                            </Text>
                           ) : null}
                         </View>
                         <View style={{ alignItems: 'flex-end' }}>
@@ -445,11 +452,13 @@ const styles = StyleSheet.create({
     fontSize: 15,
     fontWeight: '600',
     marginRight: 8,
+    flexShrink: 1,
   },
   inlineBadge: {
     paddingHorizontal: 8,
     paddingVertical: 2,
     borderRadius: 8,
+    marginRight: 15,
   },
   inlineBadgeText: {
     fontSize: 10,

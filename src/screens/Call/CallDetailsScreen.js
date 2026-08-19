@@ -232,11 +232,33 @@ export default function CallDetailsScreen({ navigation, route }) {
           </View>
 
           {scamCategory ? (
-            <View style={styles.categoryCard}>
-              <Ionicons name="alert" size={18} color="#F59E0B" style={{ marginRight: 8 }} />
-              <View>
-                <Text style={styles.categoryLabel}>Detected Scam Category</Text>
-                <Text style={styles.categoryValue}>{scamCategory}</Text>
+            <View
+              style={[
+                styles.categoryCard,
+                {
+                  backgroundColor: scamCategory === 'Standard Call' ? 'rgba(34, 197, 94, 0.08)' : (unifiedRiskScore > 60 ? 'rgba(239, 68, 68, 0.08)' : 'rgba(245, 158, 11, 0.08)'),
+                  borderColor: scamCategory === 'Standard Call' ? 'rgba(34, 197, 94, 0.2)' : (unifiedRiskScore > 60 ? 'rgba(239, 68, 68, 0.2)' : 'rgba(245, 158, 11, 0.2)'),
+                }
+              ]}
+            >
+              <Ionicons
+                name={scamCategory === 'Standard Call' ? 'shield-checkmark-outline' : 'alert'}
+                size={18}
+                color={scamCategory === 'Standard Call' ? '#22C55E' : (unifiedRiskScore > 60 ? '#EF4444' : '#F59E0B')}
+                style={{ marginRight: 8 }}
+              />
+              <View style={{ flex: 1 }}>
+                <Text style={styles.categoryLabel}>
+                  {scamCategory === 'Standard Call' ? 'Call Verification Status' : 'Detected Scam Category'}
+                </Text>
+                <Text
+                  style={[
+                    styles.categoryValue,
+                    { color: scamCategory === 'Standard Call' ? '#22C55E' : (unifiedRiskScore > 60 ? '#EF4444' : '#F59E0B') }
+                  ]}
+                >
+                  {scamCategory === 'Standard Call' ? 'Secure Call (No Scam Detected)' : scamCategory}
+                </Text>
               </View>
             </View>
           ) : null}

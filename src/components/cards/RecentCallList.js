@@ -64,7 +64,9 @@ export default function RecentCallList({ onSelectCall, onHistoryPress }) {
                   <Text style={styles.callInitials}>{item.initials || 'UC'}</Text>
                 </View>
                 <View style={styles.callInfo}>
-                  <Text style={styles.callName}>{item.name || item.number || 'Unknown'}</Text>
+                  <Text style={styles.callName} numberOfLines={1} ellipsizeMode="tail">
+                    {item.name || item.number || 'Unknown'}
+                  </Text>
                   <Text style={styles.callMeta}>
                     {item.dateLabel} · {item.time}
                   </Text>
@@ -165,6 +167,7 @@ const styles = StyleSheet.create({
     color: '#FFFFFF',
     fontSize: 15,
     fontWeight: '600',
+    flexShrink: 1,
   },
   callMeta: {
     color: colors.textMuted,
