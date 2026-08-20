@@ -80,7 +80,7 @@ export default function RecentCallList({ onSelectCall, onHistoryPress }) {
                     <Text style={[styles.badgeText, { color: badge.text }]}>{badge.label}</Text>
                   </View>
                   <Text style={styles.callTime}>
-                    {item.filterCategory === 'Missed' ? '--' : (item.unifiedRiskScore > 0 ? `${item.unifiedRiskScore}%` : '--')}
+                    {item.isSavedContact || item.filterCategory === 'Missed' ? '--' : (item.unifiedRiskScore > 0 ? `${item.unifiedRiskScore}%` : '--')}
                   </Text>
                 </View>
               </TouchableOpacity>

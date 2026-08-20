@@ -141,6 +141,8 @@ export default function CallSummaryScreen({ navigation, route }) {
       number: contact.number || contact.phone_number || '',
       name: contact.name || 'Unknown Caller',
       initials: contact.initials || 'UC',
+      isSavedContact,
+      analysisAvailable: Boolean(hasAnalysis),
       time: '--:--',
       duration: callDuration,
       authenticityScore,
