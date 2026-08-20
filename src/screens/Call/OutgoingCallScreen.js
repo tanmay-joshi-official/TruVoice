@@ -16,6 +16,7 @@ import { Audio } from 'expo-av';
 import { ROUTES } from '../../constants/routes';
 import { colors } from '../../theme';
 import { safeGoBack } from '../../utils/navigationHelper';
+import { showAlert } from '../../store/alertStore';
 
 import { agoraService } from '../../services/agora/agoraService';
 import { api } from '../../services/api/client';
@@ -94,7 +95,7 @@ export default function OutgoingCallScreen({ navigation, route }) {
           console.warn('Error enabling audio mode for outgoing call:', e);
         }
 
-        const logRes = await api.logCall(channelName, targetUserId);
+        const logRes = await api.logCall(channelName, targetUserId, contact.number || contact.phone_number);
         const loggedCallId = logRes.data?.call_id;
         if (loggedCallId) {
           setCallId(loggedCallId);
@@ -138,9 +139,15 @@ export default function OutgoingCallScreen({ navigation, route }) {
               const callDetail = await api.getVoiceCallDetail(loggedCallId);
               if (callDetail.data?.status === 'answered') {
                 navigateToActiveCall(loggedCallId, channelName);
-              } else if (['ended', 'declined', 'canceled', 'busy'].includes(callDetail.data?.status)) {
+              } else if (['ended', 'no-answer', 'no_answer', 'declined', 'canceled', 'busy'].includes(callDetail.data?.status)) {
                 if (isMounted) {
-                  setCallStatusText(callDetail.data.status === 'declined' ? 'Call Declined' : 'Call Ended');
+                  setCallStatusText(
+                    callDetail.data.status === 'declined'
+                      ? 'Call Declined'
+                      : callDetail.data.status === 'no-answer' || callDetail.data.status === 'no_answer'
+                        ? 'No Answer'
+                        : 'Call Ended',
+                  );
                   if (pollInterval) clearInterval(pollInterval);
                   await agoraService.leaveChannel();
                   setTimeout(() => safeGoBack(navigation, ROUTES.MAIN_TABS), 1500);
@@ -156,7 +163,9 @@ export default function OutgoingCallScreen({ navigation, route }) {
           if (isMounted && !hasNavigatedRef.current) {
             setCallStatusText('No Answer');
             if (pollInterval) clearInterval(pollInterval);
-            if (loggedCallId) api.updateCallStatus(loggedCallId, 'canceled');
+            if (loggedCallId) {
+              await api.updateCallStatus(loggedCallId, 'no-answer');
+            }
             await agoraService.leaveChannel();
             setTimeout(() => safeGoBack(navigation, ROUTES.MAIN_TABS), 1500);
           }
@@ -329,10 +338,11 @@ export default function OutgoingCallScreen({ navigation, route }) {
           <TouchableOpacity
             activeOpacity={0.7}
             onPress={() => {
-              Alert.alert(
+              showAlert(
                 'Add Caller',
                 'Conference calling is not supported in demo mode. Choose a contact to add once connected to backend.',
                 [{ text: 'OK' }],
+                'info',
               );
             }}
             style={styles.controlBtn}

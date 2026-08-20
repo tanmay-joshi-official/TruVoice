@@ -27,7 +27,10 @@ export const ROUTES = {
   NOTIFICATIONS: 'Notifications',
   PROFILE: 'Profile',
   SUBSCRIPTION: 'Subscription',
+  SECURITY_SETTINGS: 'SecuritySettings',
   HELP: 'Help',
+  HELP_CENTER: 'HelpCenter',
+  ABOUT: 'About',
   REPORT_SCAM: 'ReportScam',
 };
 

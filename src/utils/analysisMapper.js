@@ -1,4 +1,5 @@
 import { formatDateLabel, formatTime } from './formatters';
+import { useAuthStore } from '../store/authStore';
 
 const normalizeRiskLevel = (riskLevel = '') => {
   const value = String(riskLevel).toLowerCase();
@@ -14,6 +15,33 @@ const pickEither = (obj, camelKey, snakeKey, fallback = undefined) => {
   if (camel !== undefined && camel !== null) return camel;
   if (snake !== undefined && snake !== null) return snake;
   return fallback;
+};
+
+export const normalizePhoneNumber = (value = '') =>
+  String(value).replace(/\D/g, '');
+
+const phoneNumbersMatch = (left, right) => {
+  const normalizedLeft = normalizePhoneNumber(left);
+  const normalizedRight = normalizePhoneNumber(right);
+  if (!normalizedLeft || !normalizedRight) return false;
+  if (normalizedLeft === normalizedRight) return true;
+  if (normalizedLeft.endsWith(normalizedRight) || normalizedRight.endsWith(normalizedLeft)) {
+    return true;
+  }
+  return normalizedLeft.slice(-10) === normalizedRight.slice(-10);
+};
+
+const getCallerNumber = (item = {}) =>
+  item.callerNumber ?? item.caller_number ?? item.number ?? item.phone_number ?? '';
+
+const isGenericCallerName = (value) => {
+  const normalized = String(value || '').trim().toLowerCase();
+  return (
+    !normalized ||
+    /app[-_ ]?to[-_ ]?app/.test(normalized) ||
+    /^(unknown|target|caller)[-_ ]?(caller|user|name)?$/.test(normalized) ||
+    /^(target|caller)[-_ ]?user[-_ ]?name$/.test(normalized)
+  );
 };
 
 export const normalizeAnalysis = (data = {}) => {
@@ -85,14 +113,70 @@ export const normalizeAnalysis = (data = {}) => {
 
 export const mapAnalysisResponse = (data = {}) => normalizeAnalysis(data);
 
-export const mapHistoryItem = (item = {}) => {
+export const resolveContactName = (item = {}, contacts = []) => {
+  const rawName = pickEither(item, 'name', 'caller_name', 'target_user_name', null);
+  const callerNum = getCallerNumber(item);
+
+  const isGeneric =
+    isGenericCallerName(rawName) ||
+    /app[-_]?to[-_]?app/i.test(String(callerNum)) ||
+    phoneNumbersMatch(rawName, callerNum);
+
+  if (!isGeneric && rawName) {
+    return rawName.trim();
+  }
+
+  // Try matching caller number or ID against contacts store
+  if (Array.isArray(contacts) && contacts.length > 0) {
+    const match = contacts.find((c) => {
+      if (!c) return false;
+      const cNum = normalizePhoneNumber(c.number || c.phone_number || c.phone || '');
+      return (
+        phoneNumbersMatch(callerNum, cNum) ||
+        (c.id && String(c.id) === String(callerNum)) ||
+        (c.id && item.target_user_id && String(c.id) === String(item.target_user_id))
+      );
+    });
+    if (match && match.name) {
+      return match.name;
+    }
+  }
+
+  if (callerNum && !/app[-_]?to[-_]?app/i.test(String(callerNum))) {
+    return callerNum;
+  }
+
+  return 'Unknown Caller';
+};
+
+export const mapHistoryItem = (item = {}, contacts = []) => {
   const mapped = mapAnalysisResponse(item);
   const createdAtRaw =
     pickEither(item, 'createdAt', 'created_at') || new Date().toISOString();
   const createdAt = new Date(createdAtRaw);
-  const callerNum = pickEither(item, 'callerNumber', 'caller_number', '') || '';
+  const callerNum = getCallerNumber(item);
+  const resolvedName = resolveContactName(item, contacts);
+  const derivedInitials = resolvedName
+    .split(' ')
+    .map((w) => w[0])
+    .join('')
+    .toUpperCase()
+    .slice(0, 2) || 'UC';
+
+  const rawStatus = pickEither(item, 'status', 'status', '');
+  const isMissed = ['missed', 'no-answer', 'no_answer', 'declined', 'canceled'].includes(
+    String(rawStatus).toLowerCase(),
+  );
+
+  const currentUser = useAuthStore.getState().user;
+  const isIncoming = currentUser && item.target_user_id && String(item.target_user_id) === String(currentUser.id);
+  const isOutgoing = !isIncoming;
 
   let filterCategory = pickEither(item, 'filterCategory', null);
+  if (isMissed) {
+    filterCategory = 'Missed';
+  }
+
   if (!filterCategory) {
     filterCategory = 'Human';
     if (mapped.aiProbability > 60) filterCategory = 'AI';
@@ -103,28 +187,31 @@ export const mapHistoryItem = (item = {}) => {
 
   const badge =
     pickEither(item, 'badge', null) ||
-    (mapped.aiProbability > 60
-      ? 'AI'
-      : mapped.aiProbability > 30
-        ? 'Suspicious'
-        : 'Human');
+    (isMissed
+      ? (isOutgoing ? 'Not Answered' : 'Missed')
+      : mapped.aiProbability > 60
+        ? 'AI'
+        : mapped.aiProbability > 30
+          ? 'Suspicious'
+          : 'Human');
   const badgeColor =
     pickEither(item, 'badgeColor', null) ||
-    (mapped.aiProbability > 60
-      ? '#EF4444'
-      : mapped.aiProbability > 30
-        ? '#F59E0B'
-        : '#22C55E');
+    (isMissed
+      ? (isOutgoing ? '#71717A' : '#EF4444')
+      : mapped.aiProbability > 60
+        ? '#EF4444'
+        : mapped.aiProbability > 30
+          ? '#F59E0B'
+          : '#22C55E');
+
+  const scamCategory = pickEither(item, 'scamCategory', 'scam_category', '') || '';
 
   return {
     ...mapped,
     id: pickEither(item, 'id', 'id', mapped.id),
     number: pickEither(item, 'number', null, callerNum) || callerNum,
-    name: pickEither(item, 'name', null, callerNum || 'Unknown Caller') || callerNum || 'Unknown Caller',
-    initials:
-      pickEither(item, 'initials', null) ||
-      (callerNum || 'UC').replace(/\D/g, '').slice(-2) ||
-      'UC',
+    name: resolvedName,
+    initials: derivedInitials,
     time: pickEither(item, 'time', null, formatTime(createdAt)) || formatTime(createdAt),
     dateLabel:
       pickEither(item, 'dateLabel', null, formatDateLabel(createdAt)) ||
@@ -134,9 +221,11 @@ export const mapHistoryItem = (item = {}) => {
       formatDateLabel(createdAt),
     duration: pickEither(item, 'duration', null, '--') || '--',
     filterCategory,
+    scamCategory: scamCategory || (isMissed ? (isOutgoing ? 'Not Answered' : 'Missed Call') : ''),
     aiExplanation: pickEither(item, 'aiExplanation', null, mapped.reasoning) || mapped.reasoning,
     badge,
     badgeColor,
+    status: rawStatus,
   };
 };
 

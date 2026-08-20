@@ -28,6 +28,7 @@ import { audioProcessorService } from '../../services/audio/audioProcessorServic
 import { analysisService } from '../../services/analysis/analysisService';
 import { useAiDetectionStore } from '../../store/aiDetectionStore';
 import { useHistoryStore } from '../../store/historyStore';
+import { showAlert } from '../../store/alertStore';
 import { useContactsStore } from '../../store/contactsStore';
 import { useCallStore } from '../../store/callStore';
 import { useVoiceAnalysis } from '../../hooks/useVoiceAnalysis';
@@ -272,7 +273,7 @@ export default function ActiveCallScreen({ navigation, route }) {
   };
 
   const handleStopAnalysis = useCallback(() => {
-    Alert.alert(
+    showAlert(
       'Stop Analysis',
       'Voice analysis will be paused for this call. No audio data will be recorded or sent.',
       [
@@ -287,6 +288,7 @@ export default function ActiveCallScreen({ navigation, route }) {
           },
         },
       ],
+      'warning',
     );
   }, []);
 
@@ -481,10 +483,11 @@ export default function ActiveCallScreen({ navigation, route }) {
           <TouchableOpacity
             activeOpacity={0.7}
             onPress={() => {
-              Alert.alert(
+              showAlert(
                 'Add Caller',
                 'Conference calling and secure bridge addition will be available once backend telephony is integrated.',
-                [{ text: 'OK' }]
+                [{ text: 'OK' }],
+                'info',
               );
             }}
             style={styles.controlBtn}

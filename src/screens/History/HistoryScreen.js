@@ -18,8 +18,10 @@ import FloatingCallButton from '../../components/buttons/FloatingCallButton';
 import { ROUTES } from '../../constants/routes';
 import { colors } from '../../theme';
 import { useHistoryStore } from '../../store/historyStore';
+import { useContactsStore } from '../../store/contactsStore';
+import { resolveContactName } from '../../utils/analysisMapper';
 
-const FILTERS = ['All', 'Human', 'AI', 'Suspicious'];
+const FILTERS = ['All', 'Missed', 'Human', 'AI', 'Suspicious'];
 
 export default function HistoryScreen({ navigation }) {
   const insets = useSafeAreaInsets();
@@ -27,7 +29,9 @@ export default function HistoryScreen({ navigation }) {
   const [search, setSearch] = useState('');
   const [refreshing, setRefreshing] = useState(false);
 
-  const { items, isLoading, error, fetchHistory } = useHistoryStore();
+  const { items, isLoading, error, fetchHistory, refreshContactNames } = useHistoryStore();
+  const contacts = useContactsStore((state) => state.contacts);
+  const loadContacts = useContactsStore((state) => state.loadContacts);
 
   const loadHistory = useCallback(async () => {
     try {
@@ -43,6 +47,14 @@ export default function HistoryScreen({ navigation }) {
     }
   }, [items.length, loadHistory]);
 
+  useEffect(() => {
+    refreshContactNames();
+  }, [contacts, refreshContactNames]);
+
+  useEffect(() => {
+    loadContacts().catch(() => {});
+  }, [loadContacts]);
+
   const handleRefresh = async () => {
     setRefreshing(true);
     try {
@@ -52,8 +64,13 @@ export default function HistoryScreen({ navigation }) {
     }
   };
 
-  const filteredItems = items.filter((item) => {
-    const haystack = `${item.name || ''} ${item.number || ''} ${item.callerNumber || ''}`.toLowerCase();
+  const displayItems = items.map((item) => ({
+    ...item,
+    displayName: resolveContactName(item, contacts),
+  }));
+
+  const filteredItems = displayItems.filter((item) => {
+    const haystack = `${item.displayName || ''} ${item.number || ''} ${item.callerNumber || ''}`.toLowerCase();
     const matchesSearch = haystack.includes(search.toLowerCase());
     if (!matchesSearch) return false;
     if (activeFilter === 'All') return true;
@@ -70,6 +87,10 @@ export default function HistoryScreen({ navigation }) {
   const groupKeys = Object.keys(groupsMap);
 
   const getBadgeStyle = (item) => {
+    if (item.badge) {
+      const bg = item.badgeColor ? `${item.badgeColor}22` : 'rgba(255,255,255,0.08)';
+      return { bg, text: item.badgeColor || '#FFFFFF', label: item.badge };
+    }
     if (item.aiProbability > 60) {
       return { bg: 'rgba(239, 68, 68, 0.15)', text: '#EF4444', label: 'AI' };
     }
@@ -192,8 +213,8 @@ export default function HistoryScreen({ navigation }) {
                         </View>
                         <View style={styles.callInfo}>
                           <View style={styles.callNameRow}>
-                            <Text style={styles.callName}>
-                              {item.name || item.callerNumber || item.number || 'Unknown Caller'}
+                            <Text style={styles.callName} numberOfLines={1} ellipsizeMode="tail">
+                              {item.displayName || item.callerNumber || item.number || 'Unknown Caller'}
                             </Text>
                             <View style={[styles.inlineBadge, { backgroundColor: badge.bg }]}>
                               <Text style={[styles.inlineBadgeText, { color: badge.text }]}>
@@ -204,8 +225,15 @@ export default function HistoryScreen({ navigation }) {
                           <Text style={styles.callNumber}>
                             {item.callerNumber || item.number || 'Unknown number'}
                           </Text>
-                          {item.scamCategory ? (
-                            <Text style={styles.scamCategory}>{item.scamCategory}</Text>
+                          {item.filterCategory !== 'Missed' && item.scamCategory ? (
+                            <Text
+                              style={[
+                                styles.scamCategory,
+                                { color: item.scamCategory === 'Standard Call' ? '#22C55E' : (item.unifiedRiskScore > 60 ? '#EF4444' : '#F59E0B') }
+                              ]}
+                            >
+                              {item.scamCategory === 'Standard Call' ? 'Secure Call' : item.scamCategory}
+                            </Text>
                           ) : null}
                         </View>
                         <View style={{ alignItems: 'flex-end' }}>
@@ -213,10 +241,10 @@ export default function HistoryScreen({ navigation }) {
                           <Text
                             style={[
                               styles.callScore,
-                              { color: item.unifiedRiskScore > 60 ? '#EF4444' : item.unifiedRiskScore > 30 ? '#F59E0B' : '#22C55E' },
+                              { color: item.filterCategory === 'Missed' ? '#71717A' : (item.unifiedRiskScore > 60 ? '#EF4444' : item.unifiedRiskScore > 30 ? '#F59E0B' : '#22C55E') },
                             ]}
                           >
-                            {item.unifiedRiskScore > 0 ? `${item.unifiedRiskScore}%` : '--'}
+                            {item.filterCategory === 'Missed' ? '--' : (item.unifiedRiskScore > 0 ? `${item.unifiedRiskScore}%` : '--')}
                           </Text>
                         </View>
                       </TouchableOpacity>
@@ -428,11 +456,13 @@ const styles = StyleSheet.create({
     fontSize: 15,
     fontWeight: '600',
     marginRight: 8,
+    flexShrink: 1,
   },
   inlineBadge: {
     paddingHorizontal: 8,
     paddingVertical: 2,
     borderRadius: 8,
+    marginRight: 15,
   },
   inlineBadgeText: {
     fontSize: 10,

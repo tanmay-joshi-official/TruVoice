@@ -114,8 +114,12 @@ export const api = {
   getAgoraToken: (channelName) =>
     apiClient.post(ENDPOINTS.voiceToken, { channelName }),
 
-  logCall: (channelName, targetUserId) =>
-    apiClient.post(ENDPOINTS.voiceLogCall, { channelName, targetUserId }),
+  logCall: (channelName, targetUserId, targetPhoneNumber) =>
+    apiClient.post(ENDPOINTS.voiceLogCall, {
+      channelName,
+      targetUserId,
+      targetPhoneNumber: targetPhoneNumber || null,
+    }),
 
   updateCallStatus: (callId, status, duration = 0) =>
     apiClient.post(ENDPOINTS.voiceUpdateCall, { call_id: callId, status, duration }),

@@ -16,6 +16,7 @@ import { ROUTES } from '../../constants/routes';
 import { useContactsStore } from '../../store/contactsStore';
 import { colors } from '../../theme';
 import { safeGoBack } from '../../utils/navigationHelper';
+import { normalizePhoneNumber } from '../../utils/analysisMapper';
 
 const DIAL_KEYS = [
   { key: '1', sub: ' ' },
@@ -36,11 +37,27 @@ export default function KeypadScreen({ navigation }) {
   const insets = useSafeAreaInsets();
   const [phoneNumber, setPhoneNumber] = useState('');
   const contacts = useContactsStore((state) => state.contacts);
-  const fetchUsers = useContactsStore((state) => state.fetchUsers);
+  const loadContacts = useContactsStore((state) => state.loadContacts);
 
   useEffect(() => {
-    fetchUsers();
-  }, [fetchUsers]);
+    loadContacts();
+  }, [loadContacts]);
+
+  const matchedContacts = phoneNumber
+    ? contacts
+        .filter((c) => {
+          const cleanPhone = normalizePhoneNumber(c.number || c.phone_number || c.phone || '');
+          const cleanInput = normalizePhoneNumber(phoneNumber);
+          return cleanInput && cleanPhone && cleanPhone.includes(cleanInput);
+        })
+        .map((c) => ({
+          id: c.id,
+          name: c.name,
+          number: c.number,
+          initials: c.initials || (c.name || 'U').substring(0, 2).toUpperCase(),
+          colors: c.colors,
+        }))
+    : [];
 
   const handleKeyPress = (key) => {
     if (phoneNumber.length < 15) {
@@ -52,35 +69,53 @@ export default function KeypadScreen({ navigation }) {
     setPhoneNumber((prev) => prev.slice(0, -1));
   };
 
+  const handleClear = () => {
+    setPhoneNumber('');
+  };
+
+  const handleBackspace = () => {
+    handleDelete();
+  };
+
   const handleLongDelete = () => {
     setPhoneNumber('');
   };
 
-  const handleCall = () => {
-    if (!phoneNumber) return;
+  const handleCall = (selectedContact) => {
+    let targetContact;
+    if (selectedContact) {
+      targetContact = {
+        name: selectedContact.name,
+        number: selectedContact.number,
+        initials: selectedContact.initials || 'U',
+        userId: selectedContact.id,
+      };
+    } else {
+      if (!phoneNumber) return;
 
-    const matchedContact = contacts.find((c) => {
-      const cleanPhone = (c.phone_number || '').replace(/\D/g, '');
-      const cleanInput = phoneNumber.replace(/\D/g, '');
-      return (
-        (cleanPhone && cleanInput && cleanPhone.includes(cleanInput)) ||
-        (c.email && c.email.toLowerCase() === phoneNumber.trim().toLowerCase())
-      );
-    });
+      const matchedContact = contacts.find((c) => {
+        const cleanPhone = normalizePhoneNumber(c.number || c.phone_number || c.phone || '');
+        const cleanInput = normalizePhoneNumber(phoneNumber);
+        return (
+          (cleanPhone && cleanInput && cleanPhone.includes(cleanInput)) ||
+          (c.email && c.email.toLowerCase() === phoneNumber.trim().toLowerCase())
+        );
+      });
 
-    const targetContact = matchedContact
-      ? {
-          name: matchedContact.name,
-          number: matchedContact.phone_number || matchedContact.email,
-          initials: (matchedContact.name || 'U').substring(0, 2).toUpperCase(),
-          userId: matchedContact.id,
-        }
-      : {
-          name: phoneNumber,
-          number: phoneNumber,
-          initials: 'P',
-          userId: phoneNumber,
-        };
+      targetContact = matchedContact
+        ? {
+            name: matchedContact.name,
+            number: matchedContact.number,
+            initials: matchedContact.initials || (matchedContact.name || 'U').substring(0, 2).toUpperCase(),
+            userId: matchedContact.id,
+          }
+        : {
+            name: phoneNumber,
+            number: phoneNumber,
+            initials: 'P',
+            userId: phoneNumber,
+          };
+    }
 
     navigation.navigate(ROUTES.OUTGOING_CALL, { contact: targetContact });
   };

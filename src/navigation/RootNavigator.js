@@ -21,7 +21,14 @@ import KeypadScreen from '../screens/Call/KeypadScreen';
 import ContactsScreen from '../screens/Contacts/ContactsScreen';
 import ReportScamScreen from '../screens/Call/ReportScamScreen';
 
+import ProfileScreen from '../screens/Settings/ProfileScreen';
+import SubscriptionScreen from '../screens/Settings/SubscriptionScreen';
+import SecuritySettingsScreen from '../screens/Settings/SecuritySettingsScreen';
+import HelpCenterScreen from '../screens/Settings/HelpCenterScreen';
+import AboutScreen from '../screens/Settings/AboutScreen';
+
 import IncomingCallOverlay from '../components/IncomingCallOverlay';
+import AppAlertModal from '../components/modals/AppAlertModal';
 
 const Stack = createNativeStackNavigator();
 
@@ -42,6 +49,7 @@ export default function RootNavigator() {
   return (
     <NavigationContainer theme={navTheme}>
       <IncomingCallOverlay />
+      <AppAlertModal />
       <Stack.Navigator
 
         initialRouteName={ROUTES.SPLASH}
@@ -135,6 +143,36 @@ export default function RootNavigator() {
         <Stack.Screen
           name={ROUTES.CONTACTS}
           component={ContactsScreen}
+        />
+
+        <Stack.Screen
+          name={ROUTES.PROFILE}
+          component={ProfileScreen}
+        />
+
+        <Stack.Screen
+          name={ROUTES.SUBSCRIPTION}
+          component={SubscriptionScreen}
+        />
+
+        <Stack.Screen
+          name={ROUTES.SECURITY_SETTINGS}
+          component={SecuritySettingsScreen}
+        />
+
+        <Stack.Screen
+          name={ROUTES.HELP}
+          component={HelpCenterScreen}
+        />
+
+        <Stack.Screen
+          name={ROUTES.HELP_CENTER}
+          component={HelpCenterScreen}
+        />
+
+        <Stack.Screen
+          name={ROUTES.ABOUT}
+          component={AboutScreen}
         />
       </Stack.Navigator>
     </NavigationContainer>

@@ -26,6 +26,7 @@ import { Audio } from 'expo-av';
 import { agoraService } from '../../services/agora/agoraService';
 import { api } from '../../services/api/client';
 import { useCallStore } from '../../store/callStore';
+import { useHistoryStore } from '../../store/historyStore';
 
 function IncomingWaveBar({ delay, heightMult = 1 }) {
   const height = useSharedValue(6);
@@ -68,6 +69,12 @@ export default function IncomingCallScreen({ navigation, route }) {
       }
       if (callId) {
         api.updateCallStatus(callId, 'declined');
+        useHistoryStore.getState().addMissedCall({
+          callId,
+          callerName: contact.name,
+          callerNumber: contact.number || 'App-to-App Call',
+          callerUserId,
+        });
       }
     } catch (e) {
       console.warn('Error declining call:', e);
@@ -96,6 +103,12 @@ export default function IncomingCallScreen({ navigation, route }) {
         if (!joined) {
           if (callId) {
             await api.updateCallStatus(callId, 'canceled');
+            useHistoryStore.getState().addMissedCall({
+              callId,
+              callerName: contact.name,
+              callerNumber: contact.number || 'App-to-App Call',
+              callerUserId,
+            });
           }
           return;
         }
@@ -115,6 +128,12 @@ export default function IncomingCallScreen({ navigation, route }) {
       if (callId) {
         try {
           await api.updateCallStatus(callId, 'canceled');
+          useHistoryStore.getState().addMissedCall({
+            callId,
+            callerName: contact.name,
+            callerNumber: contact.number || 'App-to-App Call',
+            callerUserId,
+          });
         } catch (e) {
           console.warn('Unable to mark failed call as canceled:', e);
         }

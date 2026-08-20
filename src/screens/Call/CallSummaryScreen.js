@@ -18,6 +18,7 @@ import Svg, { Path, Defs, LinearGradient as SvgGradient, Stop } from 'react-nati
 import { ROUTES } from '../../constants/routes';
 import { normalizeAnalysis } from '../../utils/analysisMapper';
 import { colors } from '../../theme';
+import { showAlert } from '../../store/alertStore';
 
 const pickEither = (obj, camelKey, snakeKey, fallback = undefined) => {
   if (obj == null) return fallback;
@@ -118,7 +119,7 @@ export default function CallSummaryScreen({ navigation, route }) {
 
   const handleCopyTranscript = async () => {
     if (transcriptLines.length === 0) {
-      Alert.alert('No Transcript', 'Transcript data is not yet available for this call.');
+      showAlert('No Transcript', 'Transcript data is not yet available for this call.', [], 'info');
       return;
     }
     const transcriptText = transcriptLines
@@ -126,9 +127,9 @@ export default function CallSummaryScreen({ navigation, route }) {
       .join('\n');
     try {
       await Clipboard.setStringAsync(transcriptText);
-      Alert.alert('Copied', 'Full transcript copied to clipboard.');
+      showAlert('Copied', 'Full transcript copied to clipboard.', [], 'success');
     } catch {
-      Alert.alert('Transcript', transcriptText);
+      showAlert('Transcript', transcriptText, [], 'info');
     }
   };
 
@@ -239,9 +240,29 @@ export default function CallSummaryScreen({ navigation, route }) {
             </View>
 
             {scamCategory ? (
-              <View style={[styles.categoryBadge]}>
-                <Ionicons name="alert" size={12} color="#F59E0B" style={{ marginRight: 6 }} />
-                <Text style={styles.categoryBadgeText}>{scamCategory}</Text>
+              <View
+                style={[
+                  styles.categoryBadge,
+                  {
+                    backgroundColor: scamCategory === 'Standard Call' ? 'rgba(34, 197, 94, 0.08)' : (unifiedRiskScore > 60 ? 'rgba(239, 68, 68, 0.08)' : 'rgba(245, 158, 11, 0.08)'),
+                    borderColor: scamCategory === 'Standard Call' ? 'rgba(34, 197, 94, 0.2)' : (unifiedRiskScore > 60 ? 'rgba(239, 68, 68, 0.2)' : 'rgba(245, 158, 11, 0.2)'),
+                  }
+                ]}
+              >
+                <Ionicons
+                  name={scamCategory === 'Standard Call' ? 'shield-checkmark' : 'alert'}
+                  size={12}
+                  color={scamCategory === 'Standard Call' ? '#22C55E' : (unifiedRiskScore > 60 ? '#EF4444' : '#F59E0B')}
+                  style={{ marginRight: 6 }}
+                />
+                <Text
+                  style={[
+                    styles.categoryBadgeText,
+                    { color: scamCategory === 'Standard Call' ? '#22C55E' : (unifiedRiskScore > 60 ? '#EF4444' : '#F59E0B') }
+                  ]}
+                >
+                  {scamCategory === 'Standard Call' ? 'Secure Connection' : scamCategory}
+                </Text>
               </View>
             ) : null}
           </View>
