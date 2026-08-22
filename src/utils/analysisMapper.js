@@ -65,7 +65,14 @@ export const normalizeAnalysis = (data = {}) => {
     type: unifiedRisk >= 70 ? 'danger' : 'warning',
   }));
 
-  const transcriptText = pickEither(data, 'transcript', 'transcript', '') || '';
+  // The backend returns `transcript` as the Presidio-sanitized value. Prefer
+  // `sanitized_transcript` as well so clients remain safe if the API exposes
+  // both raw and sanitized values in a future response.
+  const transcriptText =
+    data.sanitizedTranscript ??
+    data.sanitized_transcript ??
+    pickEither(data, 'transcript', 'transcript', '') ??
+    '';
   const existingLines = pickEither(data, 'transcriptLines', null);
   const transcriptLines =
     Array.isArray(existingLines) && existingLines.length

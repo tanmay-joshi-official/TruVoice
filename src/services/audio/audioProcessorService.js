@@ -143,12 +143,11 @@ class AudioProcessorService {
 
     let totalLength = this.pcmChunks.reduce((acc, chunk) => acc + chunk.length, 0);
 
-    // Fallback: If no raw frames gathered (e.g. running in simulator/demo mode), generate silent PCM buffer
+    // Do not submit fabricated silence. It creates empty transcripts and can
+    // make the UI look like the GPU speech-to-text service has failed.
     if (totalLength === 0) {
-      const fallbackByteCount = Math.floor((this.intervalMs / 1000) * this.sampleRate * 2);
-      const fallbackBuffer = new Uint8Array(fallbackByteCount);
-      this.pcmChunks = [fallbackBuffer];
-      totalLength = fallbackByteCount;
+      console.warn('Skipping analysis: Agora provided no remote playback audio frames.');
+      return;
     }
 
     // Combine PCM chunks into single Uint8Array

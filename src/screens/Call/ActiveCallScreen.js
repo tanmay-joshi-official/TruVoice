@@ -238,10 +238,13 @@ export default function ActiveCallScreen({ navigation, route }) {
         updateAiStore(result);
         lastAnalysisRef.current = result;
 
-        if (result.transcript && !isHallucinatedTranscript(result.transcript)) {
+        // `transcript` is sanitized by the backend. Prefer the explicit field
+        // when a newer backend response includes both transcript variants.
+        const sanitizedTranscript = result.sanitized_transcript || result.sanitizedTranscript || result.transcript;
+        if (sanitizedTranscript && !isHallucinatedTranscript(sanitizedTranscript)) {
           transcriptLinesRef.current = [
             ...transcriptLinesRef.current,
-            result.transcript,
+            sanitizedTranscript,
           ].slice(-60);
         }
 
