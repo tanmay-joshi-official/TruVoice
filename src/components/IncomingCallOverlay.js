@@ -49,6 +49,21 @@ export default function IncomingCallOverlay() {
     return () => clearTimeout(timeout);
   }, [incomingCall, clearIncomingCall]);
 
+  useEffect(() => {
+    if (!incomingCall?.callId) return undefined;
+
+    const handleCallResponse = (data) => {
+      const isThisCall = String(data.callId) === String(incomingCall.callId);
+      const terminalActions = ['ended', 'declined', 'canceled', 'busy', 'no-answer', 'no_answer'];
+      if (!isThisCall || !terminalActions.includes(data.action)) return;
+
+      clearIncomingCall();
+    };
+
+    agoraService.on('call_response', handleCallResponse);
+    return () => agoraService.off('call_response', handleCallResponse);
+  }, [incomingCall, clearIncomingCall]);
+
   if (!incomingCall) return null;
 
   const handleAccept = async () => {

@@ -256,7 +256,7 @@ export default function CallDetailsScreen({ navigation, route }) {
               <Ionicons
                 name={isMissed ? 'call-outline' : (scamCategory === 'Standard Call' ? 'shield-checkmark-outline' : 'alert')}
                 size={18}
-                color={isMissed ? missedColor : (scamCategory === 'Standard Call' ? '#22C55E' : (unifiedRiskScore > 60 ? '#EF4444' : '#F59E0B'))}
+                color={isMissed ? missedColor : (unifiedRiskScore > 60 ? '#EF4444' : unifiedRiskScore > 30 ? '#F59E0B' : '#22C55E')}
                 style={{ marginRight: 8 }}
               />
               <View style={{ flex: 1 }}>
@@ -266,7 +266,7 @@ export default function CallDetailsScreen({ navigation, route }) {
                 <Text
                   style={[
                     styles.categoryValue,
-                    { color: isMissed ? missedColor : (scamCategory === 'Standard Call' ? '#22C55E' : (unifiedRiskScore > 60 ? '#EF4444' : '#F59E0B')) }
+                    { color: isMissed ? missedColor : (unifiedRiskScore > 60 ? '#EF4444' : unifiedRiskScore > 30 ? '#F59E0B' : '#22C55E') }
                   ]}
                 >
                   {isMissed ? missedLabel : (scamCategory === 'Standard Call' ? 'Secure Call (No Scam Detected)' : scamCategory)}

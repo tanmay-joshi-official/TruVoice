@@ -260,13 +260,13 @@ export default function CallSummaryScreen({ navigation, route }) {
                 <Ionicons
                   name={scamCategory === 'Standard Call' ? 'shield-checkmark' : 'alert'}
                   size={12}
-                  color={scamCategory === 'Standard Call' ? '#22C55E' : (unifiedRiskScore > 60 ? '#EF4444' : '#F59E0B')}
+                  color={unifiedRiskScore > 60 ? '#EF4444' : unifiedRiskScore > 30 ? '#F59E0B' : '#22C55E'}
                   style={{ marginRight: 6 }}
                 />
                 <Text
                   style={[
                     styles.categoryBadgeText,
-                    { color: scamCategory === 'Standard Call' ? '#22C55E' : (unifiedRiskScore > 60 ? '#EF4444' : '#F59E0B') }
+                    { color: unifiedRiskScore > 60 ? '#EF4444' : unifiedRiskScore > 30 ? '#F59E0B' : '#22C55E' }
                   ]}
                 >
                   {scamCategory === 'Standard Call' ? 'Secure Connection' : scamCategory}

@@ -8,6 +8,7 @@ import {
   StatusBar,
   Platform,
   Alert,
+  Vibration,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -110,6 +111,7 @@ export default function ActiveCallScreen({ navigation, route }) {
   const transcriptLinesRef = useRef([]);
   const lastAnalysisRef = useRef(null);
   const hasEndedRef = useRef(false);
+  const wasCriticalRef = useRef(false);
   const secondsRef = useRef(0);
 
   const activeCallId = route.params?.callId || useCallStore((s) => s.callId);
@@ -128,6 +130,7 @@ export default function ActiveCallScreen({ navigation, route }) {
   const prependHistoryItem = useHistoryStore((s) => s.prependItem);
 
   const { authenticityScore, aiProbability, confidence, riskLevelLabel, scamCategory, scamIntentScore, unifiedRiskScore, threatType, uiAlert } = aiStore;
+  const hasAnalysis = chunkCount > 0;
 
   const isSavedContact = storeContacts.some(
     (c) =>
@@ -258,6 +261,18 @@ export default function ActiveCallScreen({ navigation, route }) {
     };
   }, [shouldAnalyze, activeCallId, callerNumber, updateAiStore, prependHistoryItem]);
 
+  useEffect(() => {
+    if (!hasAnalysis) return;
+
+    const isCritical =
+      unifiedRiskScore >= 70 ||
+      String(riskLevelLabel).toLowerCase().includes('critical');
+    if (isCritical && !wasCriticalRef.current) {
+      Vibration.vibrate([0, 350, 150, 350]);
+    }
+    wasCriticalRef.current = isCritical;
+  }, [hasAnalysis, unifiedRiskScore, riskLevelLabel]);
+
   const handleToggleMute = useCallback(() => {
     const next = !isMuted;
     setIsMuted(next);
@@ -375,7 +390,9 @@ export default function ActiveCallScreen({ navigation, route }) {
             >
               <Ionicons name={getBubbleIcon()} size={20} color="#FFFFFF" />
               {!analysisStopped && (
-                <Text style={styles.bubbleScore}>{authenticityScore}%</Text>
+                <Text style={styles.bubbleScore}>
+                  {hasAnalysis ? `${authenticityScore}%` : 'Calculating...'}
+                </Text>
               )}
               {isAnalyzing && !analysisStopped && (
                 <View style={styles.bubbleSpinner} />
@@ -404,22 +421,22 @@ export default function ActiveCallScreen({ navigation, route }) {
                     <View style={styles.analysisRow}>
                       <Text style={styles.analysisLabel}>Trust score</Text>
                       <Text style={[styles.analysisValue, { color: getBubbleColor() }]}>
-                        {authenticityScore}%
+                        {hasAnalysis ? `${authenticityScore}%` : 'Calculating...'}
                       </Text>
                     </View>
                     <View style={styles.analysisRow}>
                       <Text style={styles.analysisLabel}>AI Probability</Text>
                       <Text style={[styles.analysisValue, { color: aiProbability > 50 ? '#EF4444' : '#22C55E' }]}>
-                        {aiProbability}%
+                        {hasAnalysis ? `${aiProbability}%` : 'Calculating...'}
                       </Text>
                     </View>
                     <View style={styles.analysisRow}>
                       <Text style={styles.analysisLabel}>Risk Score</Text>
                       <Text style={[styles.analysisValue, { color: unifiedRiskScore > 50 ? '#EF4444' : '#22C55E' }]}>
-                        {unifiedRiskScore}%
+                        {hasAnalysis ? `${unifiedRiskScore}%` : 'Calculating...'}
                       </Text>
                     </View>
-                    {riskLevelLabel ? (
+                    {hasAnalysis && riskLevelLabel ? (
                       <View style={styles.analysisRow}>
                         <Text style={styles.analysisLabel}>Risk</Text>
                         <Text style={[styles.analysisValue, {
