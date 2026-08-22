@@ -402,7 +402,7 @@ export default function ActiveCallScreen({ navigation, route }) {
                 ) : (
                   <View style={styles.analysisCardInner}>
                     <View style={styles.analysisRow}>
-                      <Text style={styles.analysisLabel}>Authenticity</Text>
+                      <Text style={styles.analysisLabel}>Trust score</Text>
                       <Text style={[styles.analysisValue, { color: getBubbleColor() }]}>
                         {authenticityScore}%
                       </Text>

@@ -278,7 +278,7 @@ export default function CallSummaryScreen({ navigation, route }) {
           {hasAnalysis ? (
             <View style={styles.metricsRow}>
               <View style={styles.metricCard}>
-                <Text style={styles.metricLabel}>AUTHENTICITY</Text>
+                <Text style={styles.metricLabel}>TRUST SCORE</Text>
                 <Text style={[styles.metricValue, { color: authenticityScore > 60 ? '#22C55E' : unifiedRiskScore > 60 ? '#EF4444' : '#F59E0B' }]}>
                   {`${authenticityScore}%`}
                 </Text>
@@ -301,7 +301,7 @@ export default function CallSummaryScreen({ navigation, route }) {
           ) : (
             <View style={[styles.metricsRow, { opacity: 0.6 }]}>
               <View style={styles.metricCard}>
-                <Text style={styles.metricLabel}>AUTHENTICITY</Text>
+                <Text style={styles.metricLabel}>TRUST SCORE</Text>
                 <Text style={[styles.metricValue, { color: colors.textMuted }]}>
                   {isSavedContact ? 'N/A' : '--'}
                 </Text>

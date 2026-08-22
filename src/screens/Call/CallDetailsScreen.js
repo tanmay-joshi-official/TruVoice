@@ -212,7 +212,7 @@ export default function CallDetailsScreen({ navigation, route }) {
                   borderTopColor: 'rgba(255,255,255,0.1)',
                   borderRightColor: 'rgba(255,255,255,0.1)',
                 }]}>
-                  <Text style={[styles.gaugeLabel, { color: getRiskColor() }]}>AUTHENTICITY</Text>
+                  <Text style={[styles.gaugeLabel, { color: getRiskColor() }]}>TRUST SCORE</Text>
                   <Text style={[styles.gaugeValue, { color: getRiskColor() }]}>
                     {typeof authenticityScore === 'number' ? `${authenticityScore}%` : authenticityScore}
                   </Text>

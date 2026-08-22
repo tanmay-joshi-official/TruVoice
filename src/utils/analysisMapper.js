@@ -54,7 +54,13 @@ export const normalizeAnalysis = (data = {}) => {
   const unifiedRisk = Math.round(
     pickEither(data, 'unifiedRiskScore', 'unified_risk_score', 0),
   );
-  const authenticityScore = Math.max(0, Math.round(100 - aiProbability));
+  // Trust reflects the whole call: an AI voice or scam intent reduces it.
+  // AI probability remains available separately as the voice-model signal.
+  const backendTrustScore = pickEither(data, 'trustScore', 'trust_score', null);
+  const authenticityScore = Math.max(
+    0,
+    Math.min(100, Math.round(backendTrustScore ?? (100 - unifiedRisk))),
+  );
 
   const flaggedKeywords =
     pickEither(data, 'flaggedKeywords', 'flagged_keywords') || [];
