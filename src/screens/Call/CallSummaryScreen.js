@@ -59,8 +59,10 @@ export default function CallSummaryScreen({ navigation, route }) {
     analysis,
     'riskLevelLabel',
     'risk_level',
-    unifiedRiskScore > 60 ? 'CRITICAL RISK' : unifiedRiskScore > 30 ? 'MODERATE RISK' : 'LOW RISK',
+    unifiedRiskScore > 60 ? 'SEVERE' : unifiedRiskScore > 30 ? 'MODERATE' : 'SAFE',
   );
+  const threatType = pickEither(analysis, 'threatType', 'threat_type', 'NORMAL') || 'NORMAL';
+  const uiAlert = pickEither(analysis, 'uiAlert', 'ui_alert', 'This call looks safe.') || 'This call looks safe.';
   const scamCategory = pickEither(analysis, 'scamCategory', 'scam_category', '');
   const reasoning = pickEither(analysis, 'reasoning', 'reasoning', '');
   const flaggedKeywords = pickEither(
@@ -160,6 +162,10 @@ export default function CallSummaryScreen({ navigation, route }) {
       flagged_keywords: flaggedKeywords,
       reasoning,
       aiExplanation: reasoning,
+      threatType,
+      threat_type: threatType,
+      uiAlert,
+      ui_alert: uiAlert,
       transcript: transcriptLines,
       transcriptLines,
       riskEvents: flaggedKeywords.map((k, i) => ({
@@ -341,6 +347,25 @@ export default function CallSummaryScreen({ navigation, route }) {
                   </Text>
                 ) : null}
               </View>
+
+              {uiAlert && uiAlert !== 'This call looks safe.' ? (
+                <View style={[styles.uiAlertBanner, {
+                  backgroundColor: threatType === 'AI_CLONE_SCAM' ? 'rgba(220, 38, 38, 0.1)' : 'rgba(245, 158, 11, 0.1)',
+                  borderColor: threatType === 'AI_CLONE_SCAM' ? 'rgba(220, 38, 38, 0.3)' : 'rgba(245, 158, 11, 0.3)',
+                }]}>
+                  <Ionicons
+                    name={threatType === 'AI_CLONE_SCAM' ? 'skull-outline' : 'alert-circle'}
+                    size={16}
+                    color={threatType === 'AI_CLONE_SCAM' ? '#FCA5A5' : '#FDE68A'}
+                    style={{ marginRight: 8 }}
+                  />
+                  <Text style={[styles.uiAlertText, {
+                    color: threatType === 'AI_CLONE_SCAM' ? '#FCA5A5' : '#FDE68A',
+                  }]}>
+                    {uiAlert}
+                  </Text>
+                </View>
+              ) : null}
 
               <Text style={styles.sectionTitle}>Risk timeline</Text>
               <View style={styles.chartCard}>
@@ -583,6 +608,21 @@ const styles = StyleSheet.create({
     paddingHorizontal: 10,
     paddingVertical: 4,
     borderRadius: 10,
+  },
+  uiAlertBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    borderRadius: 12,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    marginTop: 10,
+    marginBottom: 4,
+    borderWidth: 1,
+  },
+  uiAlertText: {
+    fontSize: 13,
+    fontWeight: '600',
+    flex: 1,
   },
   sectionTitle: {
     color: '#FFFFFF',

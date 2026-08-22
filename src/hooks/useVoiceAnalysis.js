@@ -40,6 +40,8 @@ export function useVoiceAnalysis(callId) {
               riskLevel: data.risk_level,
               isScam: data.is_scam,
               isAIVoice: data.is_ai_voice,
+              threatType: data.threat_type || 'NORMAL',
+              uiAlert: data.ui_alert || 'This call looks safe.',
               transcript: data.transcript,
               signals: data.signals || [],
               reasoning: data.reasoning || '',
@@ -54,6 +56,8 @@ export function useVoiceAnalysis(callId) {
                 riskLevelLabel: data.risk_level,
                 scamIntentScore: data.scam_intent_score,
                 unifiedRiskScore: data.unified_risk_score,
+                threatType: data.threat_type || 'NORMAL',
+                uiAlert: data.ui_alert || 'This call looks safe.',
               });
             }
           } else if (data.type === 'risk_alert') {

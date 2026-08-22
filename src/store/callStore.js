@@ -33,6 +33,8 @@ export const useCallStore = create((set, get) => ({
 
   isScam: null,
   isAIVoice: null,
+  threatType: null,
+  uiAlert: null,
 
   transcript: '',
   signals: [],
@@ -84,6 +86,8 @@ export const useCallStore = create((set, get) => ({
       riskLevel: null,
       isScam: null,
       isAIVoice: null,
+      threatType: null,
+      uiAlert: null,
       transcript: '',
       signals: [],
       riskAlert: null,

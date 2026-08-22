@@ -127,7 +127,7 @@ export default function ActiveCallScreen({ navigation, route }) {
   const updateAiStore = useAiDetectionStore((s) => s.updateFromBackend);
   const prependHistoryItem = useHistoryStore((s) => s.prependItem);
 
-  const { authenticityScore, aiProbability, confidence, riskLevelLabel, scamCategory, scamIntentScore, unifiedRiskScore } = aiStore;
+  const { authenticityScore, aiProbability, confidence, riskLevelLabel, scamCategory, scamIntentScore, unifiedRiskScore, threatType, uiAlert } = aiStore;
 
   const isSavedContact = storeContacts.some(
     (c) =>
@@ -312,6 +312,8 @@ export default function ActiveCallScreen({ navigation, route }) {
 
   const getBubbleColor = () => {
     if (analysisStopped) return '#71717A';
+    if (threatType === 'AI_CLONE_SCAM') return '#DC2626';
+    if (threatType === 'GENERATED_VOICE' || threatType === 'SUSPICIOUS_CALLER') return '#F59E0B';
     if (aiProbability > 60) return '#EF4444';
     if (aiProbability > 30) return '#F59E0B';
     return '#22C55E';
@@ -422,6 +424,32 @@ export default function ActiveCallScreen({ navigation, route }) {
                           fontSize: 12,
                         }]}>
                           {riskLevelLabel}
+                        </Text>
+                      </View>
+                    ) : null}
+                    {threatType && threatType !== 'NORMAL' ? (
+                      <View style={styles.analysisRow}>
+                        <Text style={styles.analysisLabel}>Threat</Text>
+                        <Text style={[styles.analysisValue, {
+                          color: threatType === 'AI_CLONE_SCAM' ? '#DC2626' : '#F59E0B',
+                          fontSize: 11,
+                        }]}>
+                          {threatType.replace(/_/g, ' ')}
+                        </Text>
+                      </View>
+                    ) : null}
+                    {uiAlert && uiAlert !== 'This call looks safe.' ? (
+                      <View style={styles.uiAlertBanner}>
+                        <Ionicons
+                          name={threatType === 'AI_CLONE_SCAM' ? 'skull-outline' : 'alert-circle'}
+                          size={14}
+                          color={threatType === 'AI_CLONE_SCAM' ? '#DC2626' : '#F59E0B'}
+                          style={{ marginRight: 6 }}
+                        />
+                        <Text style={[styles.uiAlertText, {
+                          color: threatType === 'AI_CLONE_SCAM' ? '#FCA5A5' : '#FDE68A',
+                        }]}>
+                          {uiAlert}
                         </Text>
                       </View>
                     ) : null}
@@ -708,6 +736,21 @@ const styles = StyleSheet.create({
     fontSize: 11,
     textAlign: 'center',
     marginTop: 4,
+  },
+  uiAlertBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'rgba(239, 68, 68, 0.08)',
+    borderRadius: 8,
+    paddingHorizontal: 8,
+    paddingVertical: 6,
+    marginTop: 6,
+    marginBottom: 4,
+  },
+  uiAlertText: {
+    fontSize: 11,
+    fontWeight: '600',
+    flex: 1,
   },
   cardDivider: {
     height: 1,
