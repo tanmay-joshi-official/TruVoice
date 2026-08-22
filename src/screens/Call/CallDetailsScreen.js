@@ -25,6 +25,8 @@ export default function CallDetailsScreen({ navigation, route }) {
   const call = route.params?.call || {};
 
   const callerNumber = call.callerNumber || call.caller_number || call.number || '';
+  const isSavedContact = call.isSavedContact === true;
+  const hasAnalysis = !isSavedContact && call.analysisAvailable !== false;
   const riskEvents = call.riskEvents || call.flaggedKeywords?.map((k, i) => ({
     id: `kw-${i}`,
     time: '--:--',
@@ -35,7 +37,7 @@ export default function CallDetailsScreen({ navigation, route }) {
   const authenticityScore = call.authenticityScore ?? (call.ai_voice_probability != null ? Math.max(0, 100 - Math.round(call.ai_voice_probability)) : '--');
   const aiProbability = call.aiProbability ?? Math.round(call.ai_voice_probability ?? 0);
   const unifiedRiskScore = call.unifiedRiskScore ?? Math.round(call.unified_risk_score ?? 0);
-  const riskLevelLabel = call.riskLevelLabel || call.risk_level || 'LOW RISK';
+  const riskLevelLabel = hasAnalysis ? (call.riskLevelLabel || call.risk_level || 'LOW RISK') : 'ANALYSIS UNAVAILABLE';
   const scamCategory = call.scamCategory || call.scam_category || '';
   const callTime = call.time || '--:--';
   const callDuration = call.duration || '--';
@@ -135,6 +137,7 @@ export default function CallDetailsScreen({ navigation, route }) {
   const missedColor = call.badgeColor || '#71717A';
 
   const getRiskColor = () => {
+    if (!hasAnalysis) return colors.textMuted;
     if (isMissed) return missedColor;
     if (unifiedRiskScore > 60) return '#EF4444';
     if (unifiedRiskScore > 30) return '#F59E0B';
@@ -174,7 +177,7 @@ export default function CallDetailsScreen({ navigation, route }) {
             {callerNumber ? <Text style={styles.callerNumber}>{callerNumber}</Text> : null}
             <View style={[styles.riskBadge, { backgroundColor: `${getRiskColor()}22`, borderColor: `${getRiskColor()}55` }]}>
               <Ionicons
-                name={isMissed ? 'call-outline' : (unifiedRiskScore > 60 ? 'warning' : unifiedRiskScore > 30 ? 'alert-circle' : 'shield-checkmark')}
+                name={isMissed ? 'call-outline' : (!hasAnalysis ? 'information-circle-outline' : (unifiedRiskScore > 60 ? 'warning' : unifiedRiskScore > 30 ? 'alert-circle' : 'shield-checkmark'))}
                 size={14}
                 color={getRiskColor()}
                 style={{ marginRight: 6 }}
@@ -201,7 +204,7 @@ export default function CallDetailsScreen({ navigation, route }) {
             ) : null}
           </View>
 
-          {!isMissed && (
+          {!isMissed && hasAnalysis && (
             <>
               <View style={styles.gaugeSection}>
                 <View style={[styles.gaugeCircle, {
@@ -240,7 +243,7 @@ export default function CallDetailsScreen({ navigation, route }) {
             </>
           )}
 
-          {isMissed || scamCategory ? (
+          {isMissed || (hasAnalysis && scamCategory) ? (
             <View
               style={[
                 styles.categoryCard,
@@ -271,7 +274,17 @@ export default function CallDetailsScreen({ navigation, route }) {
               </View>
             </View>
           ) : null}
-          {isMissed ? (
+
+          {!hasAnalysis && !isMissed ? (
+            <>
+              <Text style={styles.sectionTitle}>Call analysis</Text>
+              <View style={styles.card}>
+                <Text style={styles.explanationText}>
+                  Voice analysis is not available for saved contacts. No authenticity, AI probability, risk score, or transcript was generated for this call.
+                </Text>
+              </View>
+            </>
+          ) : isMissed ? (
             <>
               <Text style={styles.sectionTitle}>Call Details</Text>
               <View style={styles.card}>

@@ -244,7 +244,7 @@ export default function HistoryScreen({ navigation }) {
                               { color: item.filterCategory === 'Missed' ? '#71717A' : (item.unifiedRiskScore > 60 ? '#EF4444' : item.unifiedRiskScore > 30 ? '#F59E0B' : '#22C55E') },
                             ]}
                           >
-                            {item.filterCategory === 'Missed' ? '--' : (item.unifiedRiskScore > 0 ? `${item.unifiedRiskScore}%` : '--')}
+                            {item.isSavedContact || item.filterCategory === 'Missed' ? '--' : (item.unifiedRiskScore > 0 ? `${item.unifiedRiskScore}%` : '--')}
                           </Text>
                         </View>
                       </TouchableOpacity>

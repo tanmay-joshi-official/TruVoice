@@ -158,6 +158,14 @@ export const mapHistoryItem = (item = {}, contacts = []) => {
   const createdAt = new Date(createdAtRaw);
   const callerNum = getCallerNumber(item);
   const resolvedName = resolveContactName(item, contacts);
+  const isSavedContact = item.isSavedContact === true || contacts.some((contact) => {
+    if (!contact) return false;
+    const contactNumber = contact.number || contact.phone_number || contact.phone || '';
+    return phoneNumbersMatch(callerNum, contactNumber) || (
+      item.caller_name && contact.name &&
+      String(item.caller_name).trim().toLowerCase() === String(contact.name).trim().toLowerCase()
+    );
+  });
   const derivedInitials = resolvedName
     .split(' ')
     .map((w) => w[0])
@@ -210,6 +218,8 @@ export const mapHistoryItem = (item = {}, contacts = []) => {
 
   return {
     ...mapped,
+    isSavedContact,
+    analysisAvailable: !isSavedContact,
     id: pickEither(item, 'id', 'id', mapped.id),
     number: pickEither(item, 'number', null, callerNum) || callerNum,
     name: resolvedName,
