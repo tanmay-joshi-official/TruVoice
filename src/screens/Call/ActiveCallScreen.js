@@ -35,6 +35,7 @@ import { useCallStore } from '../../store/callStore';
 import { useVoiceAnalysis } from '../../hooks/useVoiceAnalysis';
 import { agoraService } from '../../services/agora/agoraService';
 import { api } from '../../services/api/client';
+import { getRiskScoreColor } from '../../utils/scoreColors';
 
 // Temporary call-only test mode. Change to true only after two-way Agora audio
 // is confirmed working, then re-enable analysis components one at a time.
@@ -330,17 +331,13 @@ export default function ActiveCallScreen({ navigation, route }) {
 
   const getBubbleColor = () => {
     if (analysisStopped) return '#71717A';
-    if (threatType === 'AI_CLONE_SCAM') return '#DC2626';
-    if (threatType === 'GENERATED_VOICE' || threatType === 'SUSPICIOUS_CALLER') return '#F59E0B';
-    if (aiProbability > 60) return '#EF4444';
-    if (aiProbability > 30) return '#F59E0B';
-    return '#22C55E';
+    return getRiskScoreColor(unifiedRiskScore);
   };
 
   const getBubbleIcon = () => {
     if (analysisStopped) return 'pause-circle';
-    if (aiProbability > 60) return 'warning';
-    if (aiProbability > 30) return 'alert-circle';
+    if (unifiedRiskScore >= 80) return 'warning';
+    if (unifiedRiskScore >= 50) return 'alert-circle';
     return 'shield-checkmark';
   };
 
@@ -426,13 +423,13 @@ export default function ActiveCallScreen({ navigation, route }) {
                     </View>
                     <View style={styles.analysisRow}>
                       <Text style={styles.analysisLabel}>AI Probability</Text>
-                      <Text style={[styles.analysisValue, { color: aiProbability > 50 ? '#EF4444' : '#22C55E' }]}>
+                      <Text style={[styles.analysisValue, { color: getRiskScoreColor(aiProbability) }]}>
                         {hasAnalysis ? `${aiProbability}%` : 'Calculating...'}
                       </Text>
                     </View>
                     <View style={styles.analysisRow}>
                       <Text style={styles.analysisLabel}>Risk Score</Text>
-                      <Text style={[styles.analysisValue, { color: unifiedRiskScore > 50 ? '#EF4444' : '#22C55E' }]}>
+                      <Text style={[styles.analysisValue, { color: getRiskScoreColor(unifiedRiskScore) }]}>
                         {hasAnalysis ? `${unifiedRiskScore}%` : 'Calculating...'}
                       </Text>
                     </View>
@@ -440,7 +437,7 @@ export default function ActiveCallScreen({ navigation, route }) {
                       <View style={styles.analysisRow}>
                         <Text style={styles.analysisLabel}>Risk</Text>
                         <Text style={[styles.analysisValue, {
-                          color: unifiedRiskScore > 60 ? '#EF4444' : unifiedRiskScore > 30 ? '#F59E0B' : '#22C55E',
+                          color: getRiskScoreColor(unifiedRiskScore),
                           fontSize: 12,
                         }]}>
                           {riskLevelLabel}

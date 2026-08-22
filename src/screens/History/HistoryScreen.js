@@ -20,6 +20,7 @@ import { colors } from '../../theme';
 import { useHistoryStore } from '../../store/historyStore';
 import { useContactsStore } from '../../store/contactsStore';
 import { resolveContactName } from '../../utils/analysisMapper';
+import { getRiskScoreColor } from '../../utils/scoreColors';
 
 const FILTERS = ['All', 'Missed', 'Human', 'AI', 'Suspicious'];
 
@@ -91,13 +92,14 @@ export default function HistoryScreen({ navigation }) {
       const bg = item.badgeColor ? `${item.badgeColor}22` : 'rgba(255,255,255,0.08)';
       return { bg, text: item.badgeColor || '#FFFFFF', label: item.badge };
     }
+    const scoreColor = getRiskScoreColor(Math.max(item.aiProbability || 0, item.unifiedRiskScore || 0));
     if (item.aiProbability > 60) {
-      return { bg: 'rgba(239, 68, 68, 0.15)', text: '#EF4444', label: 'AI' };
+      return { bg: `${scoreColor}26`, text: scoreColor, label: 'AI' };
     }
     if (item.aiProbability > 30 || item.unifiedRiskScore > 50) {
-      return { bg: 'rgba(245, 158, 11, 0.15)', text: '#F59E0B', label: 'Suspicious' };
+      return { bg: `${scoreColor}26`, text: scoreColor, label: 'Suspicious' };
     }
-    return { bg: 'rgba(34, 197, 94, 0.15)', text: '#22C55E', label: 'Human' };
+    return { bg: `${scoreColor}26`, text: scoreColor, label: 'Human' };
   };
 
   return (
@@ -229,7 +231,7 @@ export default function HistoryScreen({ navigation }) {
                             <Text
                               style={[
                                 styles.scamCategory,
-                                { color: item.scamCategory === 'Standard Call' ? '#22C55E' : (item.unifiedRiskScore > 60 ? '#EF4444' : '#F59E0B') }
+                                { color: getRiskScoreColor(item.unifiedRiskScore) }
                               ]}
                             >
                               {item.scamCategory === 'Standard Call' ? 'Secure Call' : item.scamCategory}
@@ -241,7 +243,7 @@ export default function HistoryScreen({ navigation }) {
                           <Text
                             style={[
                               styles.callScore,
-                              { color: item.filterCategory === 'Missed' ? '#71717A' : (item.unifiedRiskScore > 60 ? '#EF4444' : item.unifiedRiskScore > 30 ? '#F59E0B' : '#22C55E') },
+                              { color: item.filterCategory === 'Missed' ? '#71717A' : getRiskScoreColor(item.unifiedRiskScore) },
                             ]}
                           >
                             {item.isSavedContact || item.filterCategory === 'Missed' ? '--' : (item.unifiedRiskScore > 0 ? `${item.unifiedRiskScore}%` : '--')}

@@ -1,5 +1,6 @@
 import { formatDateLabel, formatTime } from './formatters';
 import { useAuthStore } from '../store/authStore';
+import { getRiskScoreColor } from './scoreColors';
 
 const normalizeRiskLevel = (riskLevel = '') => {
   const value = String(riskLevel).toLowerCase();
@@ -221,11 +222,7 @@ export const mapHistoryItem = (item = {}, contacts = []) => {
     pickEither(item, 'badgeColor', null) ||
     (isMissed
       ? (isOutgoing ? '#71717A' : '#EF4444')
-      : mapped.aiProbability > 60
-        ? '#EF4444'
-        : mapped.aiProbability > 30
-          ? '#F59E0B'
-          : '#22C55E');
+      : getRiskScoreColor(Math.max(mapped.aiProbability, mapped.unifiedRiskScore)));
 
   const scamCategory = pickEither(item, 'scamCategory', 'scam_category', '') || '';
 

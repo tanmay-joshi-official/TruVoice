@@ -19,6 +19,7 @@ import { colors } from '../../theme';
 import { safeGoBack } from '../../utils/navigationHelper';
 import { analysisService } from '../../services/analysis/analysisService';
 import { showAlert } from '../../store/alertStore';
+import { getRiskScoreBackground, getRiskScoreColor } from '../../utils/scoreColors';
 
 export default function CallDetailsScreen({ navigation, route }) {
   const insets = useSafeAreaInsets();
@@ -139,9 +140,7 @@ export default function CallDetailsScreen({ navigation, route }) {
   const getRiskColor = () => {
     if (!hasAnalysis) return colors.textMuted;
     if (isMissed) return missedColor;
-    if (unifiedRiskScore > 60) return '#EF4444';
-    if (unifiedRiskScore > 30) return '#F59E0B';
-    return '#22C55E';
+    return getRiskScoreColor(unifiedRiskScore);
   };
 
   return (
@@ -177,7 +176,7 @@ export default function CallDetailsScreen({ navigation, route }) {
             {callerNumber ? <Text style={styles.callerNumber}>{callerNumber}</Text> : null}
             <View style={[styles.riskBadge, { backgroundColor: `${getRiskColor()}22`, borderColor: `${getRiskColor()}55` }]}>
               <Ionicons
-                name={isMissed ? 'call-outline' : (!hasAnalysis ? 'information-circle-outline' : (unifiedRiskScore > 60 ? 'warning' : unifiedRiskScore > 30 ? 'alert-circle' : 'shield-checkmark'))}
+                name={isMissed ? 'call-outline' : (!hasAnalysis ? 'information-circle-outline' : (unifiedRiskScore >= 80 ? 'warning' : unifiedRiskScore >= 50 ? 'alert-circle' : 'shield-checkmark'))}
                 size={14}
                 color={getRiskColor()}
                 style={{ marginRight: 6 }}
@@ -229,7 +228,7 @@ export default function CallDetailsScreen({ navigation, route }) {
               <View style={styles.metricsRow}>
                 <View style={styles.metricCard}>
                   <Text style={styles.metricLabel}>AI PROBABILITY</Text>
-                  <Text style={[styles.metricValue, { color: aiProbability > 50 ? '#EF4444' : '#22C55E' }]}>
+                  <Text style={[styles.metricValue, { color: getRiskScoreColor(aiProbability) }]}>
                     {aiProbability}%
                   </Text>
                 </View>
@@ -248,15 +247,15 @@ export default function CallDetailsScreen({ navigation, route }) {
               style={[
                 styles.categoryCard,
                 {
-                  backgroundColor: isMissed ? `${missedColor}14` : (scamCategory === 'Standard Call' ? 'rgba(34, 197, 94, 0.08)' : (unifiedRiskScore > 60 ? 'rgba(239, 68, 68, 0.08)' : 'rgba(245, 158, 11, 0.08)')),
-                  borderColor: isMissed ? `${missedColor}33` : (scamCategory === 'Standard Call' ? 'rgba(34, 197, 94, 0.2)' : (unifiedRiskScore > 60 ? 'rgba(239, 68, 68, 0.2)' : 'rgba(245, 158, 11, 0.2)')),
+                  backgroundColor: isMissed ? `${missedColor}14` : getRiskScoreBackground(unifiedRiskScore),
+                  borderColor: isMissed ? `${missedColor}33` : getRiskScoreBackground(unifiedRiskScore, 0.2),
                 }
               ]}
             >
               <Ionicons
                 name={isMissed ? 'call-outline' : (scamCategory === 'Standard Call' ? 'shield-checkmark-outline' : 'alert')}
                 size={18}
-                color={isMissed ? missedColor : (unifiedRiskScore > 60 ? '#EF4444' : unifiedRiskScore > 30 ? '#F59E0B' : '#22C55E')}
+                color={isMissed ? missedColor : getRiskScoreColor(unifiedRiskScore)}
                 style={{ marginRight: 8 }}
               />
               <View style={{ flex: 1 }}>
@@ -266,7 +265,7 @@ export default function CallDetailsScreen({ navigation, route }) {
                 <Text
                   style={[
                     styles.categoryValue,
-                    { color: isMissed ? missedColor : (unifiedRiskScore > 60 ? '#EF4444' : unifiedRiskScore > 30 ? '#F59E0B' : '#22C55E') }
+                    { color: isMissed ? missedColor : getRiskScoreColor(unifiedRiskScore) }
                   ]}
                 >
                   {isMissed ? missedLabel : (scamCategory === 'Standard Call' ? 'Secure Call (No Scam Detected)' : scamCategory)}

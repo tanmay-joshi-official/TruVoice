@@ -18,6 +18,7 @@ import Svg, { Path, Defs, LinearGradient as SvgGradient, Stop } from 'react-nati
 import { ROUTES } from '../../constants/routes';
 import { normalizeAnalysis } from '../../utils/analysisMapper';
 import { colors } from '../../theme';
+import { getRiskScoreBackground, getRiskScoreColor } from '../../utils/scoreColors';
 import { showAlert } from '../../store/alertStore';
 
 const pickEither = (obj, camelKey, snakeKey, fallback = undefined) => {
@@ -104,17 +105,17 @@ export default function CallSummaryScreen({ navigation, route }) {
 
   const riskColor = () => {
     if (!hasAnalysis) return '#22C55E';
-    if (unifiedRiskScore > 60) return '#EF4444';
-    if (unifiedRiskScore > 30) return '#F59E0B';
-    return '#22C55E';
+    return getRiskScoreColor(unifiedRiskScore);
   };
 
   const badgeLabel = () => {
     if (isSavedContact) return { label: 'Saved contact', color: '#22C55E' };
     if (!hasAnalysis) return { label: 'No analysis', color: colors.textMuted };
-    if (aiProbability > 60) return { label: 'Synthetic voice', color: '#EF4444' };
-    if (aiProbability > 30 || unifiedRiskScore > 50) return { label: 'Suspicious', color: '#F59E0B' };
-    return { label: 'Verified human', color: '#22C55E' };
+    if (aiProbability > 60) return { label: 'Synthetic voice', color: getRiskScoreColor(aiProbability) };
+    if (aiProbability > 30 || unifiedRiskScore > 50) {
+      return { label: 'Suspicious', color: getRiskScoreColor(Math.max(aiProbability, unifiedRiskScore)) };
+    }
+    return { label: 'Verified human', color: getRiskScoreColor(Math.max(aiProbability, unifiedRiskScore)) };
   };
 
   const badge = badgeLabel();
@@ -252,21 +253,21 @@ export default function CallSummaryScreen({ navigation, route }) {
                 style={[
                   styles.categoryBadge,
                   {
-                    backgroundColor: scamCategory === 'Standard Call' ? 'rgba(34, 197, 94, 0.08)' : (unifiedRiskScore > 60 ? 'rgba(239, 68, 68, 0.08)' : 'rgba(245, 158, 11, 0.08)'),
-                    borderColor: scamCategory === 'Standard Call' ? 'rgba(34, 197, 94, 0.2)' : (unifiedRiskScore > 60 ? 'rgba(239, 68, 68, 0.2)' : 'rgba(245, 158, 11, 0.2)'),
+                    backgroundColor: getRiskScoreBackground(unifiedRiskScore),
+                    borderColor: getRiskScoreBackground(unifiedRiskScore, 0.2),
                   }
                 ]}
               >
                 <Ionicons
                   name={scamCategory === 'Standard Call' ? 'shield-checkmark' : 'alert'}
                   size={12}
-                  color={unifiedRiskScore > 60 ? '#EF4444' : unifiedRiskScore > 30 ? '#F59E0B' : '#22C55E'}
+                  color={getRiskScoreColor(unifiedRiskScore)}
                   style={{ marginRight: 6 }}
                 />
                 <Text
                   style={[
                     styles.categoryBadgeText,
-                    { color: unifiedRiskScore > 60 ? '#EF4444' : unifiedRiskScore > 30 ? '#F59E0B' : '#22C55E' }
+                    { color: getRiskScoreColor(unifiedRiskScore) }
                   ]}
                 >
                   {scamCategory === 'Standard Call' ? 'Secure Connection' : scamCategory}
@@ -278,15 +279,15 @@ export default function CallSummaryScreen({ navigation, route }) {
           {hasAnalysis ? (
             <View style={styles.metricsRow}>
               <View style={styles.metricCard}>
-                <Text style={styles.metricLabel}>TRUST SCORE</Text>
-                <Text style={[styles.metricValue, { color: authenticityScore > 60 ? '#22C55E' : unifiedRiskScore > 60 ? '#EF4444' : '#F59E0B' }]}>
-                  {`${authenticityScore}%`}
+                <Text style={styles.metricLabel}>SCAM INTENT</Text>
+                <Text style={[styles.metricValue, { color: getRiskScoreColor(scamIntentScore) }]}>
+                  {`${scamIntentScore}%`}
                 </Text>
               </View>
 
               <View style={styles.metricCard}>
                 <Text style={styles.metricLabel}>AI PROB.</Text>
-                <Text style={[styles.metricValue, { color: aiProbability > 50 ? '#EF4444' : '#22C55E' }]}>
+                <Text style={[styles.metricValue, { color: getRiskScoreColor(aiProbability) }]}>
                   {`${aiProbability}%`}
                 </Text>
               </View>
@@ -301,7 +302,7 @@ export default function CallSummaryScreen({ navigation, route }) {
           ) : (
             <View style={[styles.metricsRow, { opacity: 0.6 }]}>
               <View style={styles.metricCard}>
-                <Text style={styles.metricLabel}>TRUST SCORE</Text>
+                <Text style={styles.metricLabel}>SCAM INTENT</Text>
                 <Text style={[styles.metricValue, { color: colors.textMuted }]}>
                   {isSavedContact ? 'N/A' : '--'}
                 </Text>
@@ -328,9 +329,9 @@ export default function CallSummaryScreen({ navigation, route }) {
               <View style={styles.riskLevelRow}>
                 <Ionicons
                   name={
-                    unifiedRiskScore > 60
+                    unifiedRiskScore >= 80
                       ? 'warning'
-                      : unifiedRiskScore > 30
+                      : unifiedRiskScore >= 50
                         ? 'alert-circle'
                         : 'shield-checkmark'
                   }
@@ -341,11 +342,6 @@ export default function CallSummaryScreen({ navigation, route }) {
                 <Text style={[styles.riskLevelLabel, { color: riskColor() }]}>
                   {String(riskLevelLabel).toUpperCase()}
                 </Text>
-                {scamIntentScore > 0 ? (
-                  <Text style={styles.scamIntentPill}>
-                    Scam intent {scamIntentScore}%
-                  </Text>
-                ) : null}
               </View>
 
               {uiAlert && uiAlert !== 'This call looks safe.' ? (
