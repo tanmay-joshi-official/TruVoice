@@ -111,6 +111,7 @@ export default function ActiveCallScreen({ navigation, route }) {
 
   const transcriptLinesRef = useRef([]);
   const lastAnalysisRef = useRef(null);
+  const analysisChunksRef = useRef([]);
   const hasEndedRef = useRef(false);
   const wasCriticalRef = useRef(false);
   const secondsRef = useRef(0);
@@ -156,6 +157,7 @@ export default function ActiveCallScreen({ navigation, route }) {
       duration: `${Math.floor(elapsed / 60)}m ${elapsed % 60}s`,
       transcript: transcriptLinesRef.current,
       lastAnalysis: lastAnalysisRef.current,
+      analysisChunks: analysisChunksRef.current,
     });
   }, [navigation, contact, isSavedContact]);
 
@@ -164,6 +166,7 @@ export default function ActiveCallScreen({ navigation, route }) {
     aiStore.reset();
     transcriptLinesRef.current = [];
     lastAnalysisRef.current = null;
+    analysisChunksRef.current = [];
     useCallStore.getState().setStatus('active');
 
     const channelNameParam = route.params?.channelName || useCallStore.getState().channelName;
@@ -241,6 +244,7 @@ export default function ActiveCallScreen({ navigation, route }) {
         setChunkCount((prev) => prev + 1);
         updateAiStore(result);
         lastAnalysisRef.current = result;
+        analysisChunksRef.current.push(result);
 
         // `transcript` is sanitized by the backend. Prefer the explicit field
         // when a newer backend response includes both transcript variants.
@@ -383,7 +387,7 @@ export default function ActiveCallScreen({ navigation, route }) {
             <TouchableOpacity
               activeOpacity={0.8}
               onPress={() => setShowAnalysisCard(!showAnalysisCard)}
-              style={[styles.bubble, { backgroundColor: getBubbleColor() }]}
+              style={[styles.bubble, !hasAnalysis && styles.calculatingBubble, { backgroundColor: getBubbleColor() }]}
             >
               <Ionicons name={getBubbleIcon()} size={20} color="#FFFFFF" />
               {!analysisStopped && (
@@ -685,11 +689,16 @@ const styles = StyleSheet.create({
     shadowRadius: 8,
     elevation: 10,
   },
+  calculatingBubble: {
+    width: 112,
+    paddingHorizontal: 10,
+  },
   bubbleScore: {
     color: '#FFFFFF',
     fontSize: 10,
     fontWeight: '800',
     marginTop: 1,
+    flexShrink: 0,
   },
   bubbleSpinner: {
     position: 'absolute',

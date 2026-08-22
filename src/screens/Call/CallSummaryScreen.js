@@ -41,21 +41,36 @@ export default function CallSummaryScreen({ navigation, route }) {
   const callDuration = route.params?.duration || '--';
   const rawTranscript = route.params?.transcript || [];
   const lastAnalysisRaw = route.params?.lastAnalysis || null;
+  const analysisChunks = route.params?.analysisChunks || [];
+
+  const averagedAnalysis = useMemo(() => {
+    if (!analysisChunks.length) return null;
+
+    const chunks = analysisChunks.map((chunk) => normalizeAnalysis(chunk));
+    const average = (key) =>
+      Math.round(chunks.reduce((total, chunk) => total + Number(chunk[key] || 0), 0) / chunks.length);
+
+    return {
+      aiProbability: average('aiProbability'),
+      scamIntentScore: average('scamIntentScore'),
+      unifiedRiskScore: average('unifiedRiskScore'),
+    };
+  }, [analysisChunks]);
 
   const analysis = useMemo(
     () => (lastAnalysisRaw ? normalizeAnalysis(lastAnalysisRaw) : null),
     [lastAnalysisRaw],
   );
 
-  const aiProbability = pickEither(analysis, 'aiProbability', 'ai_voice_probability', 0);
+  const aiProbability = averagedAnalysis?.aiProbability ?? pickEither(analysis, 'aiProbability', 'ai_voice_probability', 0);
   const authenticityScore = pickEither(
     analysis,
     'authenticityScore',
     null,
     aiProbability != null ? Math.max(0, 100 - aiProbability) : 100,
   );
-  const unifiedRiskScore = pickEither(analysis, 'unifiedRiskScore', 'unified_risk_score', 0);
-  const scamIntentScore = pickEither(analysis, 'scamIntentScore', 'scam_intent_score', 0);
+  const unifiedRiskScore = averagedAnalysis?.unifiedRiskScore ?? pickEither(analysis, 'unifiedRiskScore', 'unified_risk_score', 0);
+  const scamIntentScore = averagedAnalysis?.scamIntentScore ?? pickEither(analysis, 'scamIntentScore', 'scam_intent_score', 0);
   const riskLevelLabel = pickEither(
     analysis,
     'riskLevelLabel',
