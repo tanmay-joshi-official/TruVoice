@@ -3,7 +3,7 @@ import { useAuthStore } from '../store/authStore';
 
 const normalizeRiskLevel = (riskLevel = '') => {
   const value = String(riskLevel).toLowerCase();
-  if (value.includes('critical') || value.includes('high')) return 'high';
+  if (value.includes('severe') || value.includes('critical') || value.includes('high')) return 'high';
   if (value.includes('medium') || value.includes('moderate')) return 'medium';
   return 'low';
 };
@@ -98,7 +98,9 @@ export const normalizeAnalysis = (data = {}) => {
     authenticityScore,
     confidence: Math.round(pickEither(data, 'confidence', 'confidence', unifiedRisk)),
     riskLevel: normalizeRiskLevel(riskLevelRaw),
-    riskLevelLabel: String(riskLevelRaw || 'LOW RISK'),
+    riskLevelLabel: String(riskLevelRaw || 'SAFE'),
+    threatType: pickEither(data, 'threatType', 'threat_type', 'NORMAL') || 'NORMAL',
+    uiAlert: pickEither(data, 'uiAlert', 'ui_alert', 'This call looks safe.') || 'This call looks safe.',
     scamCategory: pickEither(data, 'scamCategory', 'scam_category', '') || '',
     flaggedKeywords,
     reasoning,

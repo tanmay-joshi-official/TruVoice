@@ -15,10 +15,12 @@ export const useAiDetectionStore = create((set) => ({
   aiProbability: 0,
   confidence: 0,
   riskLevel: 'low',
-  riskLevelLabel: 'LOW RISK',
+  riskLevelLabel: 'SAFE',
   scamCategory: '',
   scamIntentScore: 0,
   unifiedRiskScore: 0,
+  threatType: 'NORMAL',
+  uiAlert: 'This call looks safe.',
   riskEvents: [],
   transcript: [],
   analysisReasons: [],
@@ -42,6 +44,10 @@ export const useAiDetectionStore = create((set) => ({
       unifiedRiskScore: Math.round(
         pickEither(data, 'unifiedRiskScore', 'unified_risk_score', normalized.unifiedRiskScore) ?? 0,
       ),
+      threatType:
+        pickEither(data, 'threatType', 'threat_type', normalized.threatType) || 'NORMAL',
+      uiAlert:
+        pickEither(data, 'uiAlert', 'ui_alert', normalized.uiAlert) || 'This call looks safe.',
       lastAnalysis: mapped.lastAnalysis || normalized,
     });
   },
@@ -64,10 +70,12 @@ export const useAiDetectionStore = create((set) => ({
       aiProbability: 0,
       confidence: 0,
       riskLevel: 'low',
-      riskLevelLabel: 'LOW RISK',
+      riskLevelLabel: 'SAFE',
       scamCategory: '',
       scamIntentScore: 0,
       unifiedRiskScore: 0,
+      threatType: 'NORMAL',
+      uiAlert: 'This call looks safe.',
       riskEvents: [],
       transcript: [],
       analysisReasons: [],
