@@ -392,7 +392,7 @@ export default function ActiveCallScreen({ navigation, route }) {
               <Ionicons name={getBubbleIcon()} size={20} color="#FFFFFF" />
               {!analysisStopped && (
                 <Text style={styles.bubbleScore}>
-                  {hasAnalysis ? `${authenticityScore}%` : 'Calculating...'}
+                  {hasAnalysis ? `${authenticityScore}%` : 'Detecting...'}
                 </Text>
               )}
               {isAnalyzing && !analysisStopped && (
@@ -422,19 +422,19 @@ export default function ActiveCallScreen({ navigation, route }) {
                     <View style={styles.analysisRow}>
                       <Text style={styles.analysisLabel}>Trust score</Text>
                       <Text style={[styles.analysisValue, { color: getBubbleColor() }]}>
-                        {hasAnalysis ? `${authenticityScore}%` : 'Calculating...'}
+                        {hasAnalysis ? `${authenticityScore}%` : 'Detecting...'}
                       </Text>
                     </View>
                     <View style={styles.analysisRow}>
                       <Text style={styles.analysisLabel}>AI Probability</Text>
                       <Text style={[styles.analysisValue, { color: getRiskScoreColor(aiProbability) }]}>
-                        {hasAnalysis ? `${aiProbability}%` : 'Calculating...'}
+                        {hasAnalysis ? `${aiProbability}%` : 'Detecting...'}
                       </Text>
                     </View>
                     <View style={styles.analysisRow}>
                       <Text style={styles.analysisLabel}>Risk Score</Text>
                       <Text style={[styles.analysisValue, { color: getRiskScoreColor(unifiedRiskScore) }]}>
-                        {hasAnalysis ? `${unifiedRiskScore}%` : 'Calculating...'}
+                        {hasAnalysis ? `${unifiedRiskScore}%` : 'Detecting...'}
                       </Text>
                     </View>
                     {hasAnalysis && riskLevelLabel ? (
