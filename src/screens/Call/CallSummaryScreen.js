@@ -308,7 +308,11 @@ export default function CallSummaryScreen({ navigation, route }) {
 
               <View style={styles.metricCard}>
                 <Text style={styles.metricLabel}>AI PROB.</Text>
-                <Text style={[styles.metricValue, { color: aiProbabilityCategory.color }]}>
+                <Text
+                  numberOfLines={1}
+                  adjustsFontSizeToFit
+                  style={[styles.metricValue, styles.aiProbabilityValue, { color: aiProbabilityCategory.color }]}
+                >
                   {aiProbabilityCategory.label}
                 </Text>
                 <Text style={styles.metricSubvalue}>{`${aiProbability}%`}</Text>
@@ -611,6 +615,10 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: '600',
     marginTop: 2,
+  },
+  aiProbabilityValue: {
+    fontSize: 20,
+    flexShrink: 1,
   },
   riskLevelRow: {
     flexDirection: 'row',
