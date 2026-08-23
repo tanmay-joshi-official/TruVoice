@@ -63,6 +63,12 @@ export default function CallSummaryScreen({ navigation, route }) {
   );
 
   const aiProbability = averagedAnalysis?.aiProbability ?? pickEither(analysis, 'aiProbability', 'ai_voice_probability', 0);
+  const aiProbabilityCategory = useMemo(() => {
+    if (aiProbability < 50) return { label: 'Low', color: '#22C55E' };
+    if (aiProbability < 70) return { label: 'Medium', color: '#F59E0B' };
+    if (aiProbability < 85) return { label: 'High', color: '#F97316' };
+    return { label: 'Critical', color: '#EF4444' };
+  }, [aiProbability]);
   const authenticityScore = pickEither(
     analysis,
     'authenticityScore',
@@ -302,9 +308,10 @@ export default function CallSummaryScreen({ navigation, route }) {
 
               <View style={styles.metricCard}>
                 <Text style={styles.metricLabel}>AI PROB.</Text>
-                <Text style={[styles.metricValue, { color: getRiskScoreColor(aiProbability) }]}>
-                  {`${aiProbability}%`}
+                <Text style={[styles.metricValue, { color: aiProbabilityCategory.color }]}>
+                  {aiProbabilityCategory.label}
                 </Text>
+                <Text style={styles.metricSubvalue}>{`${aiProbability}%`}</Text>
               </View>
 
               <View style={styles.metricCard}>
@@ -598,6 +605,12 @@ const styles = StyleSheet.create({
     fontSize: 26,
     fontWeight: '800',
     marginTop: 6,
+  },
+  metricSubvalue: {
+    color: colors.textMuted,
+    fontSize: 12,
+    fontWeight: '600',
+    marginTop: 2,
   },
   riskLevelRow: {
     flexDirection: 'row',
