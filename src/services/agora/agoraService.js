@@ -74,9 +74,15 @@ class AgoraService {
         allowsRecordingIOS: true,
         playsInSilentModeIOS: true,
         staysActiveInBackground: true,
+        // Do NOT duck Android volume — Agora manages its own audio focus.
+        // Ducking interferes with Agora's remote audio rendering.
         shouldDuckAndroid: false,
         playThroughEarpieceAndroid: !forceSpeaker,
+        // Ensure we grab exclusive audio focus on Android so the OS does not
+        // redirect the remote stream to another output device.
+        interruptionModeAndroid: 1, // INTERRUPTION_MODE_DO_NOT_MIX
       });
+      console.log(`Agora: audio mode configured (speaker=${forceSpeaker})`);
     } catch (e) {
       console.warn('Agora: unable to configure audio mode for call:', e);
     }
@@ -98,19 +104,29 @@ class AgoraService {
   _enableRemoteAudio(remoteUid = null) {
     if (!this.rtcEngine) return;
 
-    try {
-      if (remoteUid !== null && typeof this.rtcEngine.muteRemoteAudioStream === 'function') {
-        this.rtcEngine.muteRemoteAudioStream(remoteUid, false);
+    const enable = () => {
+      try {
+        if (remoteUid !== null && typeof this.rtcEngine.muteRemoteAudioStream === 'function') {
+          this.rtcEngine.muteRemoteAudioStream(remoteUid, false);
+          console.log(`Agora: unmuted remote audio stream uid=${remoteUid}`);
+        }
+        if (typeof this.rtcEngine.muteAllRemoteAudioStreams === 'function') {
+          this.rtcEngine.muteAllRemoteAudioStreams(false);
+        }
+        if (typeof this.rtcEngine.setEnableSpeakerphone === 'function') {
+          this.rtcEngine.setEnableSpeakerphone(true);
+        }
+      } catch (e) {
+        console.warn('Agora: unable to enable remote audio playback', e);
       }
-      if (typeof this.rtcEngine.muteAllRemoteAudioStreams === 'function') {
-        this.rtcEngine.muteAllRemoteAudioStreams(false);
-      }
-      if (typeof this.rtcEngine.setEnableSpeakerphone === 'function') {
-        this.rtcEngine.setEnableSpeakerphone(true);
-      }
-    } catch (e) {
-      console.warn('Agora: unable to enable remote audio playback', e);
-    }
+    };
+
+    // Immediate attempt
+    enable();
+    // Deferred retry — some Android devices need a short delay for the audio
+    // route to settle before setEnableSpeakerphone takes effect permanently.
+    setTimeout(enable, 500);
+    setTimeout(enable, 2000);
   }
 
   _registerRtcEventHandlers() {
@@ -207,6 +223,13 @@ class AgoraService {
           this.rtcEngine.setDefaultAudioRouteToSpeakerphone(true);
         }
         await this.configureAudioMode(true);
+        // Enable volume callbacks globally so onAudioVolumeIndication fires for
+        // both local and remote peers even before joinChannel is called.
+        if (typeof this.rtcEngine.enableAudioVolumeIndication === 'function') {
+          try {
+            this.rtcEngine.enableAudioVolumeIndication(200, 3, true);
+          } catch (_) {}
+        }
         this.isEngineReady = true;
         console.log(`Agora RTC engine ready (appId: ${this.appId?.substring(0, 8)}...)`);
       } catch (e) {

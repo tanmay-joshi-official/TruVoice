@@ -76,34 +76,13 @@ class AudioChunkerService {
   }
 
   async _startRecordingChunk() {
+    // Hardware mic recording is disabled — audio frames are captured via the
+    // Agora frame observer in audioProcessorService instead. Keeping this
+    // method as a no-op so existing call-sites don't crash.
     this.recording = null;
     return;
   }
 
-    const { recording } = await Audio.Recording.createAsync({
-      android: {
-        extension: '.m4a',
-        outputFormat: Audio.AndroidOutputFormat.MPEG_4,
-        audioEncoder: Audio.AndroidAudioEncoder.AAC,
-        sampleRate: 16000,
-        numberOfChannels: 1,
-        bitRate: 128000,
-      },
-      ios: {
-        extension: '.m4a',
-        audioQuality: Audio.IOSAudioQuality.HIGH,
-        sampleRate: 16000,
-        numberOfChannels: 1,
-        bitRate: 128000,
-        linearPCMBitDepth: 16,
-        linearPCMIsBigEndian: false,
-        linearPCMIsFloat: false,
-      },
-      web: {},
-    });
-
-    this.recording = recording;
-  }
 
   _scheduleNextCycle() {
     if (!this.isChunking) return;

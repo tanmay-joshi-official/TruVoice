@@ -236,31 +236,40 @@ export default function ActiveCallScreen({ navigation, route }) {
   useEffect(() => {
     if (!shouldAnalyze) return;
 
-    audioProcessorService.start(
-      activeCallId,
-      callerNumber,
-      (result) => {
-        setChunkCount((prev) => prev + 1);
-        updateAiStore(result);
-        lastAnalysisRef.current = result;
-        analysisChunksRef.current.push(result);
+    // Delay frame observer registration by 2 s so that Agora has time to
+    // fully negotiate the two-way audio path before we call
+    // setPlaybackAudioFrameParameters(). Registering the observer immediately
+    // can reset Agora's remote audio decode pipeline on some SDK versions,
+    // which is why the log shows only 1 speaker (local only).
+    const startTimer = setTimeout(() => {
+      audioProcessorService.start(
+        activeCallId,
+        callerNumber,
+        (result) => {
+          setChunkCount((prev) => prev + 1);
+          updateAiStore(result);
+          lastAnalysisRef.current = result;
+          analysisChunksRef.current.push(result);
 
-        // `transcript` is sanitized by the backend. Prefer the explicit field
-        // when a newer backend response includes both transcript variants.
-        const sanitizedTranscript = result.sanitized_transcript || result.sanitizedTranscript || result.transcript;
-        if (sanitizedTranscript && !isHallucinatedTranscript(sanitizedTranscript)) {
-          transcriptLinesRef.current = [
-            ...transcriptLinesRef.current,
-            sanitizedTranscript,
-          ].slice(-60);
-        }
+          // `transcript` is sanitized by the backend. Prefer the explicit field
+          // when a newer backend response includes both transcript variants.
+          const sanitizedTranscript = result.sanitized_transcript || result.sanitizedTranscript || result.transcript;
+          if (sanitizedTranscript && !isHallucinatedTranscript(sanitizedTranscript)) {
+            transcriptLinesRef.current = [
+              ...transcriptLinesRef.current,
+              sanitizedTranscript,
+            ].slice(-60);
+          }
 
-        prependHistoryItem(result);
-      },
-      20000,
-    );
+          prependHistoryItem(result);
+        },
+        20000,
+      );
+      console.log('[ActiveCallScreen] audioProcessorService started (2s delayed to protect Agora audio path)');
+    }, 2000);
 
     return () => {
+      clearTimeout(startTimer);
       audioProcessorService.stop();
     };
   }, [shouldAnalyze, activeCallId, callerNumber, updateAiStore, prependHistoryItem]);

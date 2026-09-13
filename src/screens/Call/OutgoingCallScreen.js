@@ -12,6 +12,7 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { Audio } from 'expo-av';
 import { ROUTES } from '../../constants/routes';
 import { colors } from '../../theme';
 import { safeGoBack } from '../../utils/navigationHelper';
