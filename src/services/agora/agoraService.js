@@ -36,13 +36,16 @@ class AgoraService {
     }
 
     const terminalActions = new Set(['ended', 'declined', 'canceled', 'busy', 'no-answer', 'no_answer']);
-    if (previousAction === 'answered' && terminalActions.has(normalizedAction)) {
-      console.warn(`Ignoring stale terminal action ${normalizedAction} for answered call ${callKey}`);
+    if (previousAction === normalizedAction) {
       return false;
     }
 
-    if (previousAction === normalizedAction) {
-      return false;
+    if (previousAction === 'answered' && terminalActions.has(normalizedAction)) {
+      const currentStatus = String(useCallStore.getState().status || '').toLowerCase();
+      if (currentStatus !== 'active') {
+        console.warn(`Ignoring stale terminal action ${normalizedAction} before call became active for ${callKey}`);
+        return false;
+      }
     }
 
     this.lastCallActionById.set(callKey, normalizedAction);
@@ -459,6 +462,13 @@ class AgoraService {
       console.warn('Cannot join channel: missing channel name or token.');
       useCallStore.getState().setConnectionState('error');
       return false;
+    }
+
+    if (this.currentChannel === channelName) {
+      console.log(`Agora: already joined channel ${channelName}; re-enabling audio and returning true.`);
+      this._enableRemoteAudio();
+      useCallStore.getState().setConnectionState('connected');
+      return true;
     }
 
     this.currentChannel = channelName;
