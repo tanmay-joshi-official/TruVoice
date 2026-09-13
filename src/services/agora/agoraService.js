@@ -39,29 +39,47 @@ class AgoraService {
     }
   }
 
+  _enableRemoteAudio(remoteUid = null) {
+    if (!this.rtcEngine) return;
+
+    try {
+      if (remoteUid !== null && typeof this.rtcEngine.muteRemoteAudioStream === 'function') {
+        this.rtcEngine.muteRemoteAudioStream(remoteUid, false);
+      }
+      if (typeof this.rtcEngine.muteAllRemoteAudioStreams === 'function') {
+        this.rtcEngine.muteAllRemoteAudioStreams(false);
+      }
+      if (typeof this.rtcEngine.setEnableSpeakerphone === 'function') {
+        this.rtcEngine.setEnableSpeakerphone(true);
+      }
+    } catch (e) {
+      console.warn('Agora: unable to enable remote audio playback', e);
+    }
+  }
+
   _registerRtcEventHandlers() {
     if (!this.rtcEngine || typeof this.rtcEngine.registerEventHandler !== 'function') return;
 
     this.rtcEngine.registerEventHandler({
       onJoinChannelSuccess: (connection, elapsed) => {
-        console.log(`Agora: joined channel ${connection?.channelId || this.currentChannel} (${elapsed}ms)`);
+        console.log(
+          `Agora: joined channel ${connection?.channelId || this.currentChannel} ` +
+          `uid=${connection?.localUid ?? this.userId} (${elapsed}ms)`,
+        );
         useCallStore.getState().setConnectionState('connected');
         this.emit('channel_joined', { channelName: connection?.channelId || this.currentChannel });
       },
       onUserJoined: (connection, remoteUid, elapsed) => {
         console.log(`Agora: remote user ${remoteUid} joined (${elapsed}ms)`);
         this.remoteUsers.add(remoteUid);
-        // Explicitly subscribe to the peer's audio. This is necessary on
-        // devices where an earlier call left a per-user mute state behind.
-        try {
-          if (typeof this.rtcEngine?.muteRemoteAudioStream === 'function') {
-            this.rtcEngine.muteRemoteAudioStream(remoteUid, false);
-          }
-        } catch (e) {
-          console.warn(`Agora: unable to unmute remote audio ${remoteUid}`, e);
-        }
+        this._enableRemoteAudio(remoteUid);
         useCallStore.getState().setConnectionState('connected');
         this.emit('remote_user_joined', { uid: remoteUid, channelName: connection?.channelId });
+      },
+      onAudioVolumeIndication: (connection, speakers) => {
+        if (Array.isArray(speakers) && speakers.length > 0) {
+          console.log(`Agora: audio volume indication for ${speakers.length} speaker(s)`);
+        }
       },
       onUserOffline: (connection, remoteUid, reason) => {
         console.log(`Agora: remote user ${remoteUid} offline (reason ${reason})`);
@@ -73,6 +91,9 @@ class AgoraService {
       },
       onRemoteAudioStateChanged: (connection, remoteUid, state, reason, elapsed) => {
         console.log(`Agora: remote audio uid=${remoteUid} state=${state} reason=${reason}`);
+        if (state === 0 || state === 2) {
+          this._enableRemoteAudio(remoteUid);
+        }
         if (state === 2) {
           this.emit('remote_audio_started', { uid: remoteUid });
         }
@@ -122,7 +143,7 @@ class AgoraService {
           this.rtcEngine.enableLocalAudio(true);
         }
         if (typeof this.rtcEngine.setDefaultAudioRouteToSpeakerphone === 'function') {
-          this.rtcEngine.setDefaultAudioRouteToSpeakerphone(false);
+          this.rtcEngine.setDefaultAudioRouteToSpeakerphone(true);
         }
         this.isEngineReady = true;
         console.log(`Agora RTC engine ready (appId: ${this.appId?.substring(0, 8)}...)`);
@@ -385,6 +406,7 @@ class AgoraService {
       };
 
       const resolvedUid = Number.isInteger(uid) && uid !== 0 ? uid : this._computeUid();
+      console.log(`Agora: joining channel ${channelName} with uid ${resolvedUid}`);
       await this.rtcEngine.joinChannel(token, channelName, resolvedUid, mediaOptions);
 
       if (typeof this.rtcEngine.enableAudio === 'function') {
@@ -396,12 +418,8 @@ class AgoraService {
       if (typeof this.rtcEngine.muteLocalAudioStream === 'function') {
         await this.rtcEngine.muteLocalAudioStream(false);
       }
-      if (typeof this.rtcEngine.muteAllRemoteAudioStreams === 'function') {
-        await this.rtcEngine.muteAllRemoteAudioStreams(false);
-      }
-      if (typeof this.rtcEngine.setEnableSpeakerphone === 'function') {
-        await this.rtcEngine.setEnableSpeakerphone(true);
-      }
+      this._enableRemoteAudio();
+      setTimeout(() => this._enableRemoteAudio(), 1000);
 
       console.log(`Joined Agora RTC channel: ${channelName} using uid ${resolvedUid}`);
       return true;

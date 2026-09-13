@@ -22,7 +22,6 @@ import { ROUTES } from '../../constants/routes';
 import { colors } from '../../theme';
 import { safeGoBack } from '../../utils/navigationHelper';
 
-import { Audio } from 'expo-av';
 import { agoraService } from '../../services/agora/agoraService';
 import { api } from '../../services/api/client';
 import { useCallStore } from '../../store/callStore';
@@ -84,18 +83,6 @@ export default function IncomingCallScreen({ navigation, route }) {
 
   const handleAccept = async () => {
     try {
-      try {
-        await Audio.setAudioModeAsync({
-          allowsRecordingIOS: true,
-          playsInSilentModeIOS: true,
-          staysActiveInBackground: true,
-          shouldDuckAndroid: true,
-          playThroughEarpieceAndroid: false,
-        });
-      } catch (e) {
-        console.warn('Error setting audio mode:', e);
-      }
-
       if (channelName) {
         const tokenRes = await api.getAgoraToken(channelName);
         const token = tokenRes.data?.token;
