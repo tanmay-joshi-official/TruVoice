@@ -39,6 +39,20 @@ class AgoraService {
     }
   }
 
+  async configureAudioMode(forceSpeaker = true) {
+    try {
+      await Audio.setAudioModeAsync({
+        allowsRecordingIOS: true,
+        playsInSilentModeIOS: true,
+        staysActiveInBackground: true,
+        shouldDuckAndroid: true,
+        playThroughEarpieceAndroid: !forceSpeaker,
+      });
+    } catch (e) {
+      console.warn('Agora: unable to configure call audio mode:', e);
+    }
+  }
+
   _registerRtcEventHandlers() {
     if (!this.rtcEngine || typeof this.rtcEngine.registerEventHandler !== 'function') return;
 
@@ -122,8 +136,9 @@ class AgoraService {
           this.rtcEngine.enableLocalAudio(true);
         }
         if (typeof this.rtcEngine.setDefaultAudioRouteToSpeakerphone === 'function') {
-          this.rtcEngine.setDefaultAudioRouteToSpeakerphone(false);
+          this.rtcEngine.setDefaultAudioRouteToSpeakerphone(true);
         }
+        await this.configureAudioMode(true);
         this.isEngineReady = true;
         console.log(`Agora RTC engine ready (appId: ${this.appId?.substring(0, 8)}...)`);
       } catch (e) {
@@ -376,6 +391,7 @@ class AgoraService {
 
     try {
       await this.requestMicrophonePermission();
+      await this.configureAudioMode(true);
 
       const mediaOptions = {
         clientRoleType: 1,
@@ -441,8 +457,14 @@ class AgoraService {
 
   async setSpeaker(isSpeakerOn) {
     try {
+      await this.configureAudioMode(isSpeakerOn);
       if (this.rtcEngine) {
-        await this.rtcEngine.setEnableSpeakerphone(isSpeakerOn);
+        if (typeof this.rtcEngine.setEnableSpeakerphone === 'function') {
+          await this.rtcEngine.setEnableSpeakerphone(isSpeakerOn);
+        }
+        if (typeof this.rtcEngine.setDefaultAudioRouteToSpeakerphone === 'function') {
+          await this.rtcEngine.setDefaultAudioRouteToSpeakerphone(isSpeakerOn);
+        }
       }
     } catch (e) {
       console.warn('Error setting speaker state:', e);
