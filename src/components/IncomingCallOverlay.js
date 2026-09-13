@@ -84,7 +84,7 @@ export default function IncomingCallOverlay() {
           allowsRecordingIOS: true,
           playsInSilentModeIOS: true,
           staysActiveInBackground: true,
-          shouldDuckAndroid: true,
+          shouldDuckAndroid: false,
           playThroughEarpieceAndroid: false,
         });
       } catch (e) {

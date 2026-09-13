@@ -236,7 +236,7 @@ export default function OutgoingCallScreen({ navigation, route }) {
         allowsRecordingIOS: true,
         playsInSilentModeIOS: true,
         staysActiveInBackground: true,
-        shouldDuckAndroid: true,
+        shouldDuckAndroid: false,
         playThroughEarpieceAndroid: !next,
       });
     } catch (e) {

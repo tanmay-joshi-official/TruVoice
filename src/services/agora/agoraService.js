@@ -74,7 +74,7 @@ class AgoraService {
         allowsRecordingIOS: true,
         playsInSilentModeIOS: true,
         staysActiveInBackground: true,
-        shouldDuckAndroid: true,
+        shouldDuckAndroid: false,
         playThroughEarpieceAndroid: !forceSpeaker,
       });
     } catch (e) {
@@ -134,7 +134,8 @@ class AgoraService {
       },
       onAudioVolumeIndication: (connection, speakers) => {
         if (Array.isArray(speakers) && speakers.length > 0) {
-          console.log(`Agora: audio volume indication for ${speakers.length} speaker(s)`);
+          const details = speakers.map((s) => `${s.uid === 0 ? 'local' : `uid=${s.uid}`}:vol=${s.volume}`).join(', ');
+          console.log(`Agora: audio volume indication (${speakers.length} speaker(s): ${details})`);
         }
       },
       onLocalAudioStateChanged: (connection, state, reason) => {
@@ -486,7 +487,7 @@ class AgoraService {
       };
 
       const resolvedUid = Number.isInteger(uid) && uid !== 0 ? uid : this._computeUid();
-      console.log(`Agora: joining channel ${channelName} with uid ${resolvedUid}`);
+      console.log(`Agora: joining channel ${channelName} with uid ${resolvedUid} (appId: ${this.appId?.substring(0, 8)}...)`);
       const joinResult = await this.rtcEngine.joinChannel(token, channelName, resolvedUid, mediaOptions);
       this._assertAgoraSuccess('joinChannel', joinResult);
 
