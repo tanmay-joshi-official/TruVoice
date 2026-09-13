@@ -39,6 +39,51 @@ class AgoraService {
     }
   }
 
+  async configureAudioMode(forceSpeaker = true) {
+    try {
+      await Audio.setAudioModeAsync({
+        allowsRecordingIOS: true,
+        playsInSilentModeIOS: true,
+        staysActiveInBackground: true,
+        shouldDuckAndroid: true,
+        playThroughEarpieceAndroid: !forceSpeaker,
+      });
+    } catch (e) {
+      console.warn('Agora: unable to configure audio mode for call:', e);
+    }
+  }
+
+  _assertAgoraSuccess(methodName, result) {
+    if (result === undefined || result === null) {
+      return result;
+    }
+    if (typeof result === 'number' && result !== 0) {
+      throw new Error(`${methodName} failed with Agora error code ${result}`);
+    }
+    if (typeof result === 'boolean' && !result) {
+      throw new Error(`${methodName} returned false`);
+    }
+    return result;
+  }
+
+  _enableRemoteAudio(remoteUid = null) {
+    if (!this.rtcEngine) return;
+
+    try {
+      if (remoteUid !== null && typeof this.rtcEngine.muteRemoteAudioStream === 'function') {
+        this.rtcEngine.muteRemoteAudioStream(remoteUid, false);
+      }
+      if (typeof this.rtcEngine.muteAllRemoteAudioStreams === 'function') {
+        this.rtcEngine.muteAllRemoteAudioStreams(false);
+      }
+      if (typeof this.rtcEngine.setEnableSpeakerphone === 'function') {
+        this.rtcEngine.setEnableSpeakerphone(true);
+      }
+    } catch (e) {
+      console.warn('Agora: unable to enable remote audio playback', e);
+    }
+  }
+
   _registerRtcEventHandlers() {
     if (!this.rtcEngine || typeof this.rtcEngine.registerEventHandler !== 'function') return;
 
@@ -378,12 +423,18 @@ class AgoraService {
       console.warn('Cannot join channel: Agora RTC engine not available. Rebuild with expo-dev-client.');
       return false;
     }
+    if (!channelName || !token) {
+      console.warn('Cannot join channel: missing channel name or token.');
+      useCallStore.getState().setConnectionState('error');
+      return false;
+    }
 
     this.currentChannel = channelName;
     useCallStore.getState().setConnectionState('connecting');
 
     try {
       await this.requestMicrophonePermission();
+      await this.configureAudioMode(true);
 
       const mediaOptions = {
         clientRoleType: 1,
