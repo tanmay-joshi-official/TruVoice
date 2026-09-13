@@ -487,7 +487,12 @@ class AgoraService {
       };
 
       const resolvedUid = Number.isInteger(uid) && uid !== 0 ? uid : this._computeUid();
-      console.log(`Agora: joining channel ${channelName} with uid ${resolvedUid} (appId: ${this.appId?.substring(0, 8)}...)`);
+      const isRealToken = String(token || '').startsWith('007');
+      console.log(
+        `Agora: joining channel ${channelName} with uid ${resolvedUid} (appId: ${this.appId?.substring(0, 8)}...) ` +
+        `token=${isRealToken ? 'REAL(007...)' : 'FAKE-dev-token — media will NOT work!'}`,
+      );
+
       const joinResult = await this.rtcEngine.joinChannel(token, channelName, resolvedUid, mediaOptions);
       this._assertAgoraSuccess('joinChannel', joinResult);
 
