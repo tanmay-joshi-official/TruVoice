@@ -12,7 +12,6 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { Audio } from 'expo-av';
 import { ROUTES } from '../../constants/routes';
 import { colors } from '../../theme';
 import { safeGoBack } from '../../utils/navigationHelper';
@@ -81,18 +80,6 @@ export default function OutgoingCallScreen({ navigation, route }) {
             setTimeout(() => safeGoBack(navigation, ROUTES.MAIN_TABS), 2000);
           }
           return;
-        }
-
-        try {
-          await Audio.setAudioModeAsync({
-            allowsRecordingIOS: true,
-            playsInSilentModeIOS: true,
-            staysActiveInBackground: true,
-            shouldDuckAndroid: true,
-            playThroughEarpieceAndroid: false,
-          });
-        } catch (e) {
-          console.warn('Error enabling audio mode for outgoing call:', e);
         }
 
         const logRes = await api.logCall(channelName, targetUserId, contact.number || contact.phone_number);

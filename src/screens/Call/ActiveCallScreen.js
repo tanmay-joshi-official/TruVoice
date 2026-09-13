@@ -13,7 +13,6 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { Audio } from 'expo-av';
 import Animated, {
   useSharedValue,
   useAnimatedStyle,
@@ -174,13 +173,6 @@ export default function ActiveCallScreen({ navigation, route }) {
       (async () => {
         try {
           await agoraService.requestMicrophonePermission();
-          await Audio.setAudioModeAsync({
-            allowsRecordingIOS: true,
-            playsInSilentModeIOS: true,
-            staysActiveInBackground: true,
-            shouldDuckAndroid: true,
-            playThroughEarpieceAndroid: false,
-          });
           const tokenRes = await api.getAgoraToken(channelNameParam);
           await agoraService.joinChannel(channelNameParam, tokenRes.data?.token);
         } catch (e) {

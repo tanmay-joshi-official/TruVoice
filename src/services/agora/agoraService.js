@@ -39,43 +39,33 @@ class AgoraService {
     }
   }
 
-  async configureAudioMode(forceSpeaker = true) {
-    try {
-      await Audio.setAudioModeAsync({
-        allowsRecordingIOS: true,
-        playsInSilentModeIOS: true,
-        staysActiveInBackground: true,
-        shouldDuckAndroid: true,
-        playThroughEarpieceAndroid: !forceSpeaker,
-      });
-    } catch (e) {
-      console.warn('Agora: unable to configure call audio mode:', e);
-    }
-  }
-
   _registerRtcEventHandlers() {
     if (!this.rtcEngine || typeof this.rtcEngine.registerEventHandler !== 'function') return;
 
     this.rtcEngine.registerEventHandler({
       onJoinChannelSuccess: (connection, elapsed) => {
-        console.log(`Agora: joined channel ${connection?.channelId || this.currentChannel} (${elapsed}ms)`);
+        console.log(
+          `Agora: joined channel ${connection?.channelId || this.currentChannel} ` +
+          `uid=${connection?.localUid ?? this.userId} (${elapsed}ms)`,
+        );
         useCallStore.getState().setConnectionState('connected');
         this.emit('channel_joined', { channelName: connection?.channelId || this.currentChannel });
       },
       onUserJoined: (connection, remoteUid, elapsed) => {
         console.log(`Agora: remote user ${remoteUid} joined (${elapsed}ms)`);
         this.remoteUsers.add(remoteUid);
-        // Explicitly subscribe to the peer's audio. This is necessary on
-        // devices where an earlier call left a per-user mute state behind.
-        try {
-          if (typeof this.rtcEngine?.muteRemoteAudioStream === 'function') {
-            this.rtcEngine.muteRemoteAudioStream(remoteUid, false);
-          }
-        } catch (e) {
-          console.warn(`Agora: unable to unmute remote audio ${remoteUid}`, e);
-        }
+        this._enableRemoteAudio(remoteUid);
         useCallStore.getState().setConnectionState('connected');
         this.emit('remote_user_joined', { uid: remoteUid, channelName: connection?.channelId });
+      },
+      onAudioVolumeIndication: (connection, speakers) => {
+        if (Array.isArray(speakers) && speakers.length > 0) {
+          console.log(`Agora: audio volume indication for ${speakers.length} speaker(s)`);
+        }
+      },
+      onLocalAudioStateChanged: (connection, state, reason) => {
+        console.log(`Agora: local audio state=${state} reason=${reason}`);
+        this.emit('local_audio_state_changed', { state, reason });
       },
       onUserOffline: (connection, remoteUid, reason) => {
         console.log(`Agora: remote user ${remoteUid} offline (reason ${reason})`);
@@ -87,6 +77,9 @@ class AgoraService {
       },
       onRemoteAudioStateChanged: (connection, remoteUid, state, reason, elapsed) => {
         console.log(`Agora: remote audio uid=${remoteUid} state=${state} reason=${reason}`);
+        if (state === 0 || state === 2) {
+          this._enableRemoteAudio(remoteUid);
+        }
         if (state === 2) {
           this.emit('remote_audio_started', { uid: remoteUid });
         }
@@ -391,7 +384,6 @@ class AgoraService {
 
     try {
       await this.requestMicrophonePermission();
-      await this.configureAudioMode(true);
 
       const mediaOptions = {
         clientRoleType: 1,
@@ -401,23 +393,27 @@ class AgoraService {
       };
 
       const resolvedUid = Number.isInteger(uid) && uid !== 0 ? uid : this._computeUid();
-      await this.rtcEngine.joinChannel(token, channelName, resolvedUid, mediaOptions);
+      console.log(`Agora: joining channel ${channelName} with uid ${resolvedUid}`);
+      const joinResult = await this.rtcEngine.joinChannel(token, channelName, resolvedUid, mediaOptions);
+      this._assertAgoraSuccess('joinChannel', joinResult);
 
       if (typeof this.rtcEngine.enableAudio === 'function') {
-        await this.rtcEngine.enableAudio();
+        this._assertAgoraSuccess('enableAudio', await this.rtcEngine.enableAudio());
       }
       if (typeof this.rtcEngine.enableLocalAudio === 'function') {
-        await this.rtcEngine.enableLocalAudio(true);
+        this._assertAgoraSuccess('enableLocalAudio', await this.rtcEngine.enableLocalAudio(true));
       }
       if (typeof this.rtcEngine.muteLocalAudioStream === 'function') {
-        await this.rtcEngine.muteLocalAudioStream(false);
+        this._assertAgoraSuccess('muteLocalAudioStream', await this.rtcEngine.muteLocalAudioStream(false));
       }
-      if (typeof this.rtcEngine.muteAllRemoteAudioStreams === 'function') {
-        await this.rtcEngine.muteAllRemoteAudioStreams(false);
+      if (typeof this.rtcEngine.enableAudioVolumeIndication === 'function') {
+        this._assertAgoraSuccess(
+          'enableAudioVolumeIndication',
+          await this.rtcEngine.enableAudioVolumeIndication(250, 3, true),
+        );
       }
-      if (typeof this.rtcEngine.setEnableSpeakerphone === 'function') {
-        await this.rtcEngine.setEnableSpeakerphone(true);
-      }
+      this._enableRemoteAudio();
+      setTimeout(() => this._enableRemoteAudio(), 1000);
 
       console.log(`Joined Agora RTC channel: ${channelName} using uid ${resolvedUid}`);
       return true;
@@ -448,7 +444,10 @@ class AgoraService {
   async setMuted(isMuted) {
     try {
       if (this.rtcEngine) {
-        await this.rtcEngine.muteLocalAudioStream(isMuted);
+        this._assertAgoraSuccess(
+          'muteLocalAudioStream',
+          await this.rtcEngine.muteLocalAudioStream(Boolean(isMuted)),
+        );
       }
     } catch (e) {
       console.warn('Error setting mute state:', e);
