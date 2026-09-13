@@ -67,7 +67,15 @@ export default function OutgoingCallScreen({ navigation, route }) {
 
     async function initiateAgoraCall() {
       try {
-        const targetUserId = contact.userId || contact.number || 'target-user-id';
+        const targetUserId = contact.userId || contact.id || contact.number || null;
+        if (!targetUserId) {
+          if (isMounted) {
+            setCallStatusText('This contact is not on TruVoice');
+            setTimeout(() => safeGoBack(navigation, ROUTES.MAIN_TABS), 1800);
+          }
+          return;
+        }
+
         const channelName = `truvoice_${Date.now()}_${Math.floor(Math.random() * 1000)}`;
         activeChannelRef.current = channelName;
         setChannelName(channelName);
