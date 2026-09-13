@@ -184,11 +184,7 @@ class AudioChunkerService {
       }
     }
 
-    try {
-      await Audio.setAudioModeAsync({ allowsRecordingIOS: false });
-    } catch {
-      // silent
-    }
+    // No-op for Audio.setAudioModeAsync to avoid resetting or interfering with Agora audio session
   }
 }
 

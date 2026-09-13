@@ -12,7 +12,6 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { Audio } from 'expo-av';
 import { ROUTES } from '../../constants/routes';
 import { colors } from '../../theme';
 import { safeGoBack } from '../../utils/navigationHelper';
@@ -102,7 +101,8 @@ export default function OutgoingCallScreen({ navigation, route }) {
         try {
           const tokenRes = await api.getAgoraToken(channelName);
           const token = tokenRes.data?.token;
-          const joined = await agoraService.joinChannel(channelName, token);
+          const uid = tokenRes.data?.uid;
+          const joined = await agoraService.joinChannel(channelName, token, uid);
           if (!joined) {
             if (loggedCallId) {
               await api.updateCallStatus(loggedCallId, 'canceled');
@@ -239,15 +239,8 @@ export default function OutgoingCallScreen({ navigation, route }) {
       const next = !isSpeaker;
       setIsSpeaker(next);
       await agoraService.setSpeaker(next);
-      await Audio.setAudioModeAsync({
-        allowsRecordingIOS: true,
-        playsInSilentModeIOS: true,
-        staysActiveInBackground: true,
-        shouldDuckAndroid: false,
-        playThroughEarpieceAndroid: !next,
-      });
     } catch (e) {
-      console.warn('Error setting audio mode:', e);
+      console.warn('Error setting speaker mode:', e);
     }
   };
 

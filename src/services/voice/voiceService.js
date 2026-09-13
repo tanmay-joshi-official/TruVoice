@@ -23,26 +23,11 @@ class VoiceService {
   }
 
   async setMuted(isMuted) {
-    try {
-      // Configure audio mode for call audio routing
-      await Audio.setAudioModeAsync({
-        allowsRecordingIOS: true,
-        playsInSilentModeIOS: true,
-      });
-    } catch (e) {
-      console.warn('Error setting mute state:', e);
-    }
+    // Agora manages mic muting directly
   }
 
   async setSpeaker(isSpeakerOn) {
-    try {
-      await Audio.setAudioModeAsync({
-        playsInSilentModeIOS: true,
-        playThroughEarpieceAndroid: !isSpeakerOn,
-      });
-    } catch (e) {
-      console.warn('Error setting speaker state:', e);
-    }
+    // Agora manages speaker routing directly
   }
 }
 

@@ -9,7 +9,6 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
-import { Audio } from 'expo-av';
 import { useCallStore } from '../store/callStore';
 import { useHistoryStore } from '../store/historyStore';
 import { agoraService } from '../services/agora/agoraService';
@@ -80,23 +79,12 @@ export default function IncomingCallOverlay() {
         return;
       }
 
-      try {
-        await Audio.setAudioModeAsync({
-          allowsRecordingIOS: true,
-          playsInSilentModeIOS: true,
-          staysActiveInBackground: true,
-          shouldDuckAndroid: false,
-          playThroughEarpieceAndroid: false,
-        });
-      } catch (e) {
-        console.warn('Error setting audio mode on accept:', e);
-      }
-
       const tokenRes = await api.getAgoraToken(channelName);
       const token = tokenRes.data?.token;
-      console.log(`[IncomingCallOverlay] got Agora token, joining channel ${channelName}...`);
+      const uid = tokenRes.data?.uid;
+      console.log(`[IncomingCallOverlay] got Agora token (uid=${uid}), joining channel ${channelName}...`);
 
-      const joined = await agoraService.joinChannel(channelName, token);
+      const joined = await agoraService.joinChannel(channelName, token, uid);
       if (!joined) {
         console.warn(`[IncomingCallOverlay] joinChannel FAILED for ${channelName}`);
         if (callId) {

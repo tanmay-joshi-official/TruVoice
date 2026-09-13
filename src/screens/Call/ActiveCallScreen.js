@@ -177,7 +177,7 @@ export default function ActiveCallScreen({ navigation, route }) {
         try {
           await agoraService.requestMicrophonePermission();
           const tokenRes = await api.getAgoraToken(channelNameParam);
-          await agoraService.joinChannel(channelNameParam, tokenRes.data?.token);
+          await agoraService.joinChannel(channelNameParam, tokenRes.data?.token, tokenRes.data?.uid);
         } catch (e) {
           console.warn('ActiveCallScreen channel join warning:', e);
         }

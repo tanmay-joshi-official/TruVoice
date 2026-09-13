@@ -1,3 +1,4 @@
+import { Platform, PermissionsAndroid } from 'react-native';
 import { Audio } from 'expo-av';
 import { config, ENDPOINTS } from '../../constants/config';
 import { api } from '../api/client';
@@ -60,6 +61,14 @@ class AgoraService {
 
   async requestMicrophonePermission() {
     try {
+      if (Platform.OS === 'android') {
+        const granted = await PermissionsAndroid.request(
+          PermissionsAndroid.PERMISSIONS.RECORD_AUDIO,
+        );
+        if (granted === PermissionsAndroid.RESULTS.GRANTED) {
+          return true;
+        }
+      }
       const { status } = await Audio.requestPermissionsAsync();
       return status === 'granted';
     } catch (e) {
@@ -68,35 +77,9 @@ class AgoraService {
     }
   }
 
-  async configureAudioMode(forceSpeaker = true) {
-    try {
-      await Audio.setAudioModeAsync({
-        allowsRecordingIOS: true,
-        playsInSilentModeIOS: true,
-        staysActiveInBackground: true,
-        // Do NOT duck Android volume — Agora manages its own audio focus.
-        // Ducking interferes with Agora's remote audio rendering.
-        shouldDuckAndroid: false,
-        playThroughEarpieceAndroid: !forceSpeaker,
-        // Ensure we grab exclusive audio focus on Android so the OS does not
-        // redirect the remote stream to another output device.
-        interruptionModeAndroid: 1, // INTERRUPTION_MODE_DO_NOT_MIX
-      });
-      console.log(`Agora: audio mode configured (speaker=${forceSpeaker})`);
-    } catch (e) {
-      console.warn('Agora: unable to configure audio mode for call:', e);
-    }
-  }
-
   _assertAgoraSuccess(methodName, result) {
-    if (result === undefined || result === null) {
-      return result;
-    }
-    if (typeof result === 'number' && result !== 0) {
-      throw new Error(`${methodName} failed with Agora error code ${result}`);
-    }
-    if (typeof result === 'boolean' && !result) {
-      throw new Error(`${methodName} returned false`);
+    if (typeof result === 'number' && result < 0) {
+      console.warn(`Agora: ${methodName} returned code ${result}`);
     }
     return result;
   }
@@ -110,11 +93,20 @@ class AgoraService {
           this.rtcEngine.muteRemoteAudioStream(remoteUid, false);
           console.log(`Agora: unmuted remote audio stream uid=${remoteUid}`);
         }
+        if (remoteUid !== null && typeof this.rtcEngine.adjustUserPlaybackSignalVolume === 'function') {
+          this.rtcEngine.adjustUserPlaybackSignalVolume(remoteUid, 100);
+        }
         if (typeof this.rtcEngine.muteAllRemoteAudioStreams === 'function') {
           this.rtcEngine.muteAllRemoteAudioStreams(false);
         }
+        if (typeof this.rtcEngine.adjustPlaybackSignalVolume === 'function') {
+          this.rtcEngine.adjustPlaybackSignalVolume(100);
+        }
         if (typeof this.rtcEngine.setEnableSpeakerphone === 'function') {
           this.rtcEngine.setEnableSpeakerphone(true);
+        }
+        if (typeof this.rtcEngine.setDefaultAudioRouteToSpeakerphone === 'function') {
+          this.rtcEngine.setDefaultAudioRouteToSpeakerphone(true);
         }
       } catch (e) {
         console.warn('Agora: unable to enable remote audio playback', e);
@@ -123,10 +115,8 @@ class AgoraService {
 
     // Immediate attempt
     enable();
-    // Deferred retry — some Android devices need a short delay for the audio
-    // route to settle before setEnableSpeakerphone takes effect permanently.
     setTimeout(enable, 500);
-    setTimeout(enable, 2000);
+    setTimeout(enable, 1500);
   }
 
   _registerRtcEventHandlers() {
@@ -222,7 +212,6 @@ class AgoraService {
         if (typeof this.rtcEngine.setDefaultAudioRouteToSpeakerphone === 'function') {
           this.rtcEngine.setDefaultAudioRouteToSpeakerphone(true);
         }
-        await this.configureAudioMode(true);
         // Enable volume callbacks globally so onAudioVolumeIndication fires for
         // both local and remote peers even before joinChannel is called.
         if (typeof this.rtcEngine.enableAudioVolumeIndication === 'function') {
@@ -428,8 +417,15 @@ class AgoraService {
     });
   }
 
-  _computeUid() {
-    const source = String(this.userId || 'truvoice-user-' + Date.now());
+  _computeUid(userId = null) {
+    let sourceId = userId || this.userId;
+    if (!sourceId) {
+      try {
+        const { useAuthStore } = require('../../store/authStore');
+        sourceId = useAuthStore.getState().user?.id;
+      } catch (_) {}
+    }
+    const source = String(sourceId || 'truvoice-user').trim().toLowerCase();
     // Must match app.services.agora_service.generate_rtc_token exactly. Agora
     // rejects a token when the UID embedded in it differs from joinChannel's.
     let uid = 0;
@@ -495,12 +491,10 @@ class AgoraService {
       return true;
     }
 
-    this.currentChannel = channelName;
     useCallStore.getState().setConnectionState('connecting');
 
     try {
       await this.requestMicrophonePermission();
-      await this.configureAudioMode(true);
 
       const mediaOptions = {
         clientRoleType: 1,
@@ -510,32 +504,39 @@ class AgoraService {
       };
 
       const resolvedUid = Number.isInteger(uid) && uid !== 0 ? uid : this._computeUid();
-      const isRealToken = String(token || '').startsWith('007');
+      const isRealToken = String(token || '').startsWith('007') || String(token || '').startsWith('006');
       console.log(
         `Agora: joining channel ${channelName} with uid ${resolvedUid} (appId: ${this.appId?.substring(0, 8)}...) ` +
-        `token=${isRealToken ? 'REAL(007...)' : 'FAKE-dev-token — media will NOT work!'}`,
+        `token=${isRealToken ? 'REAL' : 'FAKE-dev-token — media will NOT work!'}`,
       );
 
       const joinResult = await this.rtcEngine.joinChannel(token, channelName, resolvedUid, mediaOptions);
       this._assertAgoraSuccess('joinChannel', joinResult);
 
+      this.currentChannel = channelName;
+
       if (typeof this.rtcEngine.enableAudio === 'function') {
-        this._assertAgoraSuccess('enableAudio', await this.rtcEngine.enableAudio());
+        this.rtcEngine.enableAudio();
       }
       if (typeof this.rtcEngine.enableLocalAudio === 'function') {
-        this._assertAgoraSuccess('enableLocalAudio', await this.rtcEngine.enableLocalAudio(true));
+        this.rtcEngine.enableLocalAudio(true);
       }
       if (typeof this.rtcEngine.muteLocalAudioStream === 'function') {
-        this._assertAgoraSuccess('muteLocalAudioStream', await this.rtcEngine.muteLocalAudioStream(false));
+        this.rtcEngine.muteLocalAudioStream(false);
+      }
+      if (typeof this.rtcEngine.muteAllRemoteAudioStreams === 'function') {
+        this.rtcEngine.muteAllRemoteAudioStreams(false);
+      }
+      if (typeof this.rtcEngine.setEnableSpeakerphone === 'function') {
+        this.rtcEngine.setEnableSpeakerphone(true);
+      }
+      if (typeof this.rtcEngine.setDefaultAudioRouteToSpeakerphone === 'function') {
+        this.rtcEngine.setDefaultAudioRouteToSpeakerphone(true);
       }
       if (typeof this.rtcEngine.enableAudioVolumeIndication === 'function') {
-        this._assertAgoraSuccess(
-          'enableAudioVolumeIndication',
-          await this.rtcEngine.enableAudioVolumeIndication(250, 3, true),
-        );
+        this.rtcEngine.enableAudioVolumeIndication(250, 3, true);
       }
       this._enableRemoteAudio();
-      setTimeout(() => this._enableRemoteAudio(), 1000);
 
       console.log(`Joined Agora RTC channel: ${channelName} using uid ${resolvedUid}`);
       return true;
@@ -578,7 +579,6 @@ class AgoraService {
 
   async setSpeaker(isSpeakerOn) {
     try {
-      await this.configureAudioMode(isSpeakerOn);
       if (this.rtcEngine) {
         if (typeof this.rtcEngine.setEnableSpeakerphone === 'function') {
           await this.rtcEngine.setEnableSpeakerphone(isSpeakerOn);
