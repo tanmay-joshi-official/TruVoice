@@ -39,17 +39,12 @@ class AgoraService {
     }
   }
 
-  async configureAudioMode(forceSpeaker = true) {
-    try {
-      await Audio.setAudioModeAsync({
-        allowsRecordingIOS: true,
-        playsInSilentModeIOS: true,
-        staysActiveInBackground: true,
-        shouldDuckAndroid: true,
-        playThroughEarpieceAndroid: !forceSpeaker,
-      });
-    } catch (e) {
-      console.warn('Agora: unable to configure audio mode for call:', e);
+  _assertAgoraSuccess(operation, result) {
+    // react-native-agora methods return 0 on success and a negative Agora
+    // error code on failure. Awaiting the result alone previously treated a
+    // failed native audio operation as successful and left the UI connected.
+    if (typeof result === 'number' && result < 0) {
+      throw new Error(`Agora ${operation} failed (code ${result})`);
     }
   }
 
@@ -94,6 +89,10 @@ class AgoraService {
         if (Array.isArray(speakers) && speakers.length > 0) {
           console.log(`Agora: audio volume indication for ${speakers.length} speaker(s)`);
         }
+      },
+      onLocalAudioStateChanged: (connection, state, reason) => {
+        console.log(`Agora: local audio state=${state} reason=${reason}`);
+        this.emit('local_audio_state_changed', { state, reason });
       },
       onUserOffline: (connection, remoteUid, reason) => {
         console.log(`Agora: remote user ${remoteUid} offline (reason ${reason})`);
@@ -159,7 +158,6 @@ class AgoraService {
         if (typeof this.rtcEngine.setDefaultAudioRouteToSpeakerphone === 'function') {
           this.rtcEngine.setDefaultAudioRouteToSpeakerphone(true);
         }
-        await this.configureAudioMode(true);
         this.isEngineReady = true;
         console.log(`Agora RTC engine ready (appId: ${this.appId?.substring(0, 8)}...)`);
       } catch (e) {
@@ -411,8 +409,10 @@ class AgoraService {
     useCallStore.getState().setConnectionState('connecting');
 
     try {
-      await this.requestMicrophonePermission();
-      await this.configureAudioMode(true);
+      const microphoneGranted = await this.requestMicrophonePermission();
+      if (!microphoneGranted) {
+        throw new Error('Microphone permission is required for an Agora call.');
+      }
 
       const mediaOptions = {
         clientRoleType: 1,
@@ -423,16 +423,23 @@ class AgoraService {
 
       const resolvedUid = Number.isInteger(uid) && uid !== 0 ? uid : this._computeUid();
       console.log(`Agora: joining channel ${channelName} with uid ${resolvedUid}`);
-      await this.rtcEngine.joinChannel(token, channelName, resolvedUid, mediaOptions);
+      const joinResult = await this.rtcEngine.joinChannel(token, channelName, resolvedUid, mediaOptions);
+      this._assertAgoraSuccess('joinChannel', joinResult);
 
       if (typeof this.rtcEngine.enableAudio === 'function') {
-        await this.rtcEngine.enableAudio();
+        this._assertAgoraSuccess('enableAudio', await this.rtcEngine.enableAudio());
       }
       if (typeof this.rtcEngine.enableLocalAudio === 'function') {
-        await this.rtcEngine.enableLocalAudio(true);
+        this._assertAgoraSuccess('enableLocalAudio', await this.rtcEngine.enableLocalAudio(true));
       }
       if (typeof this.rtcEngine.muteLocalAudioStream === 'function') {
-        await this.rtcEngine.muteLocalAudioStream(false);
+        this._assertAgoraSuccess('muteLocalAudioStream', await this.rtcEngine.muteLocalAudioStream(false));
+      }
+      if (typeof this.rtcEngine.enableAudioVolumeIndication === 'function') {
+        this._assertAgoraSuccess(
+          'enableAudioVolumeIndication',
+          await this.rtcEngine.enableAudioVolumeIndication(250, 3, true),
+        );
       }
       this._enableRemoteAudio();
       setTimeout(() => this._enableRemoteAudio(), 1000);
@@ -466,7 +473,10 @@ class AgoraService {
   async setMuted(isMuted) {
     try {
       if (this.rtcEngine) {
-        await this.rtcEngine.muteLocalAudioStream(isMuted);
+        this._assertAgoraSuccess(
+          'muteLocalAudioStream',
+          await this.rtcEngine.muteLocalAudioStream(Boolean(isMuted)),
+        );
       }
     } catch (e) {
       console.warn('Error setting mute state:', e);
@@ -475,7 +485,6 @@ class AgoraService {
 
   async setSpeaker(isSpeakerOn) {
     try {
-      await this.configureAudioMode(isSpeakerOn);
       if (this.rtcEngine) {
         if (typeof this.rtcEngine.setEnableSpeakerphone === 'function') {
           await this.rtcEngine.setEnableSpeakerphone(isSpeakerOn);
