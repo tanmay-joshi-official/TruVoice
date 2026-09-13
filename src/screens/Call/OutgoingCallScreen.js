@@ -48,6 +48,7 @@ export default function OutgoingCallScreen({ navigation, route }) {
   const navigateToActiveCall = useCallback((targetCallId, channelName) => {
     if (hasNavigatedRef.current) return;
     hasNavigatedRef.current = true;
+    console.log(`[OutgoingCallScreen] navigateToActiveCall: callId=${targetCallId}, channel=${channelName}, agoraCurrentChannel=${agoraService.currentChannel}`);
     setStatus('active');
 
     navigation.replace(ROUTES.ACTIVE_CALL, {
@@ -132,9 +133,12 @@ export default function OutgoingCallScreen({ navigation, route }) {
             if (hasNavigatedRef.current) return;
             try {
               const callDetail = await api.getVoiceCallDetail(loggedCallId);
-              if (callDetail.data?.status === 'answered') {
+              const pollStatus = callDetail.data?.status;
+              console.log(`[OutgoingCallScreen] poll: callId=${loggedCallId}, status=${pollStatus}`);
+              if (pollStatus === 'answered') {
+                console.log(`[OutgoingCallScreen] poll detected 'answered' → navigateToActiveCall`);
                 navigateToActiveCall(loggedCallId, channelName);
-              } else if (['ended', 'no-answer', 'no_answer', 'declined', 'canceled', 'busy'].includes(callDetail.data?.status)) {
+              } else if (['ended', 'no-answer', 'no_answer', 'declined', 'canceled', 'busy'].includes(pollStatus)) {
                 if (isMounted) {
                   setCallStatusText(
                     callDetail.data.status === 'declined'
@@ -181,8 +185,10 @@ export default function OutgoingCallScreen({ navigation, route }) {
     const handleCallResponse = (data) => {
       const currentCallId = activeCallIdRef.current;
       const isThisCall = !data.callId || !currentCallId || String(data.callId) === String(currentCallId);
+      console.log(`[OutgoingCallScreen] call_response: action=${data.action}, callId=${data.callId}, isThisCall=${isThisCall}, hasNavigated=${hasNavigatedRef.current}`);
 
       if (data.action === 'answered' && isThisCall) {
+        console.log(`[OutgoingCallScreen] WS 'answered' → navigateToActiveCall`);
         navigateToActiveCall(
           data.callId || currentCallId,
           data.channelName || activeChannelRef.current,

@@ -142,9 +142,10 @@ export default function ActiveCallScreen({ navigation, route }) {
   const callerNumber = contact.number || contact.phone_number || '';
   const shouldAnalyze = ENABLE_AI_ANALYSIS && !isSavedContact && !analysisStopped;
 
-  const finishCall = useCallback(() => {
+  const finishCall = useCallback((reason = 'unknown') => {
     if (hasEndedRef.current) return;
     hasEndedRef.current = true;
+    console.log(`[ActiveCallScreen] finishCall triggered. reason=${reason}, callId=${activeCallId}, elapsed=${secondsRef.current}s, agoraChannel=${agoraService.currentChannel}`);
     audioProcessorService.stop();
     agoraService.leaveChannel().catch((e) => {
       console.warn('Error leaving Agora call:', e);
@@ -158,7 +159,7 @@ export default function ActiveCallScreen({ navigation, route }) {
       lastAnalysis: lastAnalysisRef.current,
       analysisChunks: analysisChunksRef.current,
     });
-  }, [navigation, contact, isSavedContact]);
+  }, [navigation, contact, isSavedContact, activeCallId]);
 
 
   useEffect(() => {
@@ -169,7 +170,9 @@ export default function ActiveCallScreen({ navigation, route }) {
     useCallStore.getState().setStatus('active');
 
     const channelNameParam = route.params?.channelName || useCallStore.getState().channelName;
+    console.log(`[ActiveCallScreen] mounted. callId=${activeCallId}, channelParam=${channelNameParam}, agoraCurrentChannel=${agoraService.currentChannel}`);
     if (channelNameParam && agoraService.currentChannel !== channelNameParam) {
+      console.log(`[ActiveCallScreen] channel mismatch — rejoining: current=${agoraService.currentChannel} vs param=${channelNameParam}`);
       (async () => {
         try {
           await agoraService.requestMicrophonePermission();
@@ -179,12 +182,15 @@ export default function ActiveCallScreen({ navigation, route }) {
           console.warn('ActiveCallScreen channel join warning:', e);
         }
       })();
+    } else {
+      console.log(`[ActiveCallScreen] already in correct Agora channel ${channelNameParam}. No re-join needed.`);
     }
 
     const handleCallEndedSignal = (data) => {
       const isThisCall = !data.callId || String(data.callId) === String(activeCallId);
+      console.log(`[ActiveCallScreen] call_response signal: action=${data.action}, callId=${data.callId}, isThisCall=${isThisCall}`);
       if (isThisCall && !hasEndedRef.current && ['ended', 'declined', 'canceled', 'busy'].includes(data.action)) {
-        finishCall();
+        finishCall(`ws-signal:${data.action}`);
       }
     };
 
@@ -213,9 +219,10 @@ export default function ActiveCallScreen({ navigation, route }) {
       if (hasEndedRef.current) return;
       try {
         const response = await api.getVoiceCallDetail(activeCallId);
-        if (terminalStatuses.has(response.data?.status)) {
-          console.log(`Call ${activeCallId} ended according to status poll.`);
-          finishCall();
+        const currentStatus = response.data?.status;
+        if (terminalStatuses.has(currentStatus)) {
+          console.log(`[ActiveCallScreen] status poll: callId=${activeCallId} status=${currentStatus} → finishCall`);
+          finishCall(`status-poll:${currentStatus}`);
         }
       } catch (e) {
         // Signaling remains the primary mechanism; retry on the next poll.

@@ -69,6 +69,7 @@ export default function IncomingCallOverlay() {
   const handleAccept = async () => {
     try {
       const { channelName, callId, callerName, callerUserId } = incomingCall;
+      console.log(`[IncomingCallOverlay] handleAccept: callId=${callId}, channel=${channelName}`);
       setCallId(callId);
       setChannelName(channelName);
       if (callId) agoraService.markCallHandled(callId);
@@ -93,9 +94,11 @@ export default function IncomingCallOverlay() {
 
       const tokenRes = await api.getAgoraToken(channelName);
       const token = tokenRes.data?.token;
+      console.log(`[IncomingCallOverlay] got Agora token, joining channel ${channelName}...`);
 
       const joined = await agoraService.joinChannel(channelName, token);
       if (!joined) {
+        console.warn(`[IncomingCallOverlay] joinChannel FAILED for ${channelName}`);
         if (callId) {
           await api.updateCallStatus(callId, 'canceled');
         }
@@ -103,10 +106,12 @@ export default function IncomingCallOverlay() {
         return;
       }
 
+      console.log(`[IncomingCallOverlay] joined channel, sending respondToCallInvitation...`);
       await agoraService.respondToCallInvitation(callerUserId, 'accept', channelName, callId);
 
       clearIncomingCall();
 
+      console.log(`[IncomingCallOverlay] navigating to ACTIVE_CALL...`);
       navigation.navigate(ROUTES.ACTIVE_CALL, {
         contact: {
           name: callerName || 'Incoming Caller',
@@ -118,7 +123,7 @@ export default function IncomingCallOverlay() {
         channelName,
       });
     } catch (err) {
-      console.warn('Error accepting incoming call:', err);
+      console.warn('[IncomingCallOverlay] Error accepting incoming call:', err);
       if (incomingCall.callId) {
         try {
           await api.updateCallStatus(incomingCall.callId, 'canceled');
