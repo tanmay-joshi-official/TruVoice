@@ -21,6 +21,32 @@ class AgoraService {
     this.remoteUsers = new Set();
     this.handledCallIds = new Set();
     this.pendingEndCallIds = new Set();
+    this.lastCallActionById = new Map();
+  }
+
+  shouldHandleCallAction(callId, action) {
+    const callKey = String(callId || '');
+    const normalizedAction = String(action || '').toLowerCase();
+    if (!callKey || !normalizedAction) return true;
+
+    const previousAction = this.lastCallActionById.get(callKey);
+    if (!previousAction) {
+      this.lastCallActionById.set(callKey, normalizedAction);
+      return true;
+    }
+
+    const terminalActions = new Set(['ended', 'declined', 'canceled', 'busy', 'no-answer', 'no_answer']);
+    if (previousAction === 'answered' && terminalActions.has(normalizedAction)) {
+      console.warn(`Ignoring stale terminal action ${normalizedAction} for answered call ${callKey}`);
+      return false;
+    }
+
+    if (previousAction === normalizedAction) {
+      return false;
+    }
+
+    this.lastCallActionById.set(callKey, normalizedAction);
+    return true;
   }
 
   markCallHandled(callId) {
@@ -238,9 +264,15 @@ class AgoraService {
               callerName: msg.callerName || 'Incoming Caller',
             });
           } else if (msg.type === 'call_response') {
+            const callId = String(msg.callId || '');
+            const action = String(msg.action || '').toLowerCase();
+            if (!this.shouldHandleCallAction(callId, action)) {
+              console.log(`Ignoring duplicate/stale call response for ${callId}: ${action}`);
+              return;
+            }
             const respPayload = {
-              callId: String(msg.callId),
-              action: msg.action,
+              callId,
+              action,
               channelName: msg.channelName,
             };
             this.lastCallResponse = respPayload;

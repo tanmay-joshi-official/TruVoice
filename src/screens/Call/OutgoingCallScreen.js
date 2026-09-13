@@ -171,25 +171,26 @@ export default function OutgoingCallScreen({ navigation, route }) {
     }
 
     const handleCallResponse = (data) => {
-      if (hasNavigatedRef.current) return;
-
       const currentCallId = activeCallIdRef.current;
-      const matchesCall =
-        data.action === 'answered' &&
-        (!data.callId || !currentCallId || String(data.callId) === String(currentCallId));
+      const isThisCall = !data.callId || !currentCallId || String(data.callId) === String(currentCallId);
 
-      if (matchesCall) {
+      if (data.action === 'answered' && isThisCall) {
         navigateToActiveCall(
           data.callId || currentCallId,
           data.channelName || activeChannelRef.current,
         );
-      } else if (['declined', 'decline', 'busy', 'ended', 'canceled'].includes(data.action)) {
-        if (String(data.callId) === String(currentCallId) || !data.callId) {
-          if (isMounted) {
-            setCallStatusText(data.action === 'declined' || data.action === 'decline' ? 'Call Declined' : 'Call Ended');
-            agoraService.leaveChannel().catch(() => {});
-            setTimeout(() => safeGoBack(navigation, ROUTES.MAIN_TABS), 1500);
-          }
+        return;
+      }
+
+      if (hasNavigatedRef.current) {
+        return;
+      }
+
+      if (['declined', 'decline', 'busy', 'ended', 'canceled'].includes(data.action) && isThisCall) {
+        if (isMounted) {
+          setCallStatusText(data.action === 'declined' || data.action === 'decline' ? 'Call Declined' : 'Call Ended');
+          agoraService.leaveChannel().catch(() => {});
+          setTimeout(() => safeGoBack(navigation, ROUTES.MAIN_TABS), 1500);
         }
       }
     };

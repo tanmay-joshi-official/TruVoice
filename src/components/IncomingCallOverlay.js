@@ -142,7 +142,6 @@ export default function IncomingCallOverlay() {
       if (callId) agoraService.markCallHandled(callId);
       await agoraService.respondToCallInvitation(callerUserId, 'decline', channelName, callId);
       if (callId) {
-        await api.updateCallStatus(callId, 'declined');
         useHistoryStore.getState().addMissedCall({
           callId,
           callerName,

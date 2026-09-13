@@ -67,7 +67,6 @@ export default function IncomingCallScreen({ navigation, route }) {
         await agoraService.respondToCallInvitation(callerUserId, 'decline', channelName, callId);
       }
       if (callId) {
-        api.updateCallStatus(callId, 'declined');
         useHistoryStore.getState().addMissedCall({
           callId,
           callerName: contact.name,
@@ -103,10 +102,6 @@ export default function IncomingCallScreen({ navigation, route }) {
 
       if (callerUserId && channelName) {
         await agoraService.respondToCallInvitation(callerUserId, 'accept', channelName, callId);
-      }
-
-      if (callId) {
-        await api.updateCallStatus(callId, 'answered');
       }
 
       navigation.replace(ROUTES.ACTIVE_CALL, { contact, callId, channelName });
