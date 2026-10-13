@@ -428,26 +428,26 @@ export default function ActiveCallScreen({ navigation, route }) {
                 ) : (
                   <View style={styles.analysisCardInner}>
                     <View style={styles.analysisRow}>
-                      <Text style={styles.analysisLabel}>Trust score</Text>
+                      <Text style={styles.analysisLabel}>Scam Intent</Text>
                       <Text style={[styles.analysisValue, { color: getBubbleColor() }]}>
                         {hasAnalysis ? `${authenticityScore}%` : 'Detecting...'}
                       </Text>
                     </View>
                     <View style={styles.analysisRow}>
-                      <Text style={styles.analysisLabel}>AI Probability</Text>
+                      <Text style={styles.analysisLabel}>AI voice</Text>
                       <Text style={[styles.analysisValue, { color: getRiskScoreColor(aiProbability) }]}>
                         {hasAnalysis ? `${aiProbability}%` : 'Detecting...'}
                       </Text>
                     </View>
                     <View style={styles.analysisRow}>
-                      <Text style={styles.analysisLabel}>Risk Score</Text>
+                      <Text style={styles.analysisLabel}>Overall risk</Text>
                       <Text style={[styles.analysisValue, { color: getRiskScoreColor(unifiedRiskScore) }]}>
                         {hasAnalysis ? `${unifiedRiskScore}%` : 'Detecting...'}
                       </Text>
                     </View>
                     {hasAnalysis && riskLevelLabel ? (
                       <View style={styles.analysisRow}>
-                        <Text style={styles.analysisLabel}>Risk</Text>
+                        <Text style={styles.analysisLabel}>Risk level</Text>
                         <Text style={[styles.analysisValue, {
                           color: getRiskScoreColor(unifiedRiskScore),
                           fontSize: 12,
