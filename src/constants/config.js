@@ -64,6 +64,9 @@ export const ENDPOINTS = {
   voiceCalls: '/api/v1/voice/calls',
   voicePendingCall: '/api/v1/voice/pending-call',
   voiceCallDetail: (id) => `/api/v1/voice/calls/${encodeURIComponent(id)}`,
+  guardianSettings: '/api/v1/guardian-alerts/settings',
+  guardianContacts: '/api/v1/guardian-alerts/contacts',
+  guardianContact: (id) => `/api/v1/guardian-alerts/contacts/${encodeURIComponent(id)}`,
   wsSignaling: (token) =>
     `${DEFAULT_WS_BASE_URL}/ws/signaling?token=${encodeURIComponent(token)}`,
   wsLiveAnalysis: (callId, token) =>
@@ -73,4 +76,3 @@ export const ENDPOINTS = {
 
 
 export default config;
-

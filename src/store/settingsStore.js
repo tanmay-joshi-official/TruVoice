@@ -5,6 +5,7 @@ export const useSettingsStore = create((set) => ({
   notificationsEnabled: true,
   biometricEnabled: false,
   hapticFeedback: true,
+  elderlyModeEnabled: false,
 
   toggleAiProtection: () =>
     set((state) => ({ aiProtectionEnabled: !state.aiProtectionEnabled })),
@@ -14,6 +15,8 @@ export const useSettingsStore = create((set) => ({
     set((state) => ({ biometricEnabled: !state.biometricEnabled })),
   toggleHaptic: () =>
     set((state) => ({ hapticFeedback: !state.hapticFeedback })),
+  setElderlyModeEnabled: (enabled) =>
+    set({ elderlyModeEnabled: Boolean(enabled) }),
 }));
 
 export default useSettingsStore;

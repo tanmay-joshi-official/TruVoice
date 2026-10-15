@@ -50,6 +50,12 @@ Current caller ID solutions only verify **who is calling**, not **whether the vo
 - Human probability
 - Risk classification
 
+### 🛡️ Elderly Mode & Guardian Alerts
+
+- Enable elderly mode from Settings for larger call-screen text and spoken severe-risk warnings.
+- Add up to five trusted email contacts; each address must be verified before it can receive guardian alert emails.
+- Guardian emails are sent only after two consecutive severe risk windows and include an unsubscribe link.
+
 ### ⚡ Streaming Audio Pipeline
 
 - Continuous audio processing

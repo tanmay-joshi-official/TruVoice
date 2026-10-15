@@ -29,6 +29,7 @@ export default function SettingsScreen({ navigation }) {
   const historyItems = useHistoryStore((state) => state.items);
   const contacts = useContactsStore((state) => state.contacts);
   const aiProtectionEnabled = useSettingsStore((state) => state.aiProtectionEnabled);
+  const elderlyModeEnabled = useSettingsStore((state) => state.elderlyModeEnabled);
 
   // Derive display values from auth store user, with fallbacks
   const displayName = getEffectiveUserName(user);
@@ -67,6 +68,10 @@ export default function SettingsScreen({ navigation }) {
 
   const handleSecuritySettings = () => {
     navigation.navigate(ROUTES.SECURITY_SETTINGS);
+  };
+
+  const handleElderlyMode = () => {
+    navigation.navigate(ROUTES.ELDERLY_MODE);
   };
 
   const handleHelpCenter = () => {
@@ -171,6 +176,23 @@ export default function SettingsScreen({ navigation }) {
                   <Text style={styles.menuTitle}>Security settings</Text>
                   <Text style={styles.menuSubtitle}>
                     {aiProtectionEnabled ? 'Protection Active' : 'Protection Paused'}
+                  </Text>
+                </View>
+              </View>
+              <Ionicons name="chevron-forward" size={18} color={colors.textMuted} />
+            </TouchableOpacity>
+
+            <View style={styles.rowDivider} />
+
+            <TouchableOpacity activeOpacity={0.7} onPress={handleElderlyMode} style={styles.menuItem}>
+              <View style={styles.menuLeft}>
+                <View style={styles.menuIconBox}>
+                  <Ionicons name="accessibility-outline" size={20} color="#A78BFA" />
+                </View>
+                <View>
+                  <Text style={styles.menuTitle}>Elderly mode & guardian alerts</Text>
+                  <Text style={styles.menuSubtitle}>
+                    {elderlyModeEnabled ? 'Enabled' : 'Large text, spoken warnings & contacts'}
                   </Text>
                 </View>
               </View>

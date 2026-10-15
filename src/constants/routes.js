@@ -28,6 +28,7 @@ export const ROUTES = {
   PROFILE: 'Profile',
   SUBSCRIPTION: 'Subscription',
   SECURITY_SETTINGS: 'SecuritySettings',
+  ELDERLY_MODE: 'ElderlyMode',
   HELP: 'Help',
   HELP_CENTER: 'HelpCenter',
   ABOUT: 'About',

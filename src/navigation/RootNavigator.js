@@ -26,6 +26,7 @@ import SubscriptionScreen from '../screens/Settings/SubscriptionScreen';
 import SecuritySettingsScreen from '../screens/Settings/SecuritySettingsScreen';
 import HelpCenterScreen from '../screens/Settings/HelpCenterScreen';
 import AboutScreen from '../screens/Settings/AboutScreen';
+import ElderlyModeScreen from '../screens/Settings/ElderlyModeScreen';
 
 import IncomingCallOverlay from '../components/IncomingCallOverlay';
 import AppAlertModal from '../components/modals/AppAlertModal';
@@ -173,6 +174,12 @@ export default function RootNavigator() {
         <Stack.Screen
           name={ROUTES.ABOUT}
           component={AboutScreen}
+        />
+
+        <Stack.Screen
+          name={ROUTES.ELDERLY_MODE}
+          component={ElderlyModeScreen}
+          options={{ headerShown: false }}
         />
       </Stack.Navigator>
     </NavigationContainer>

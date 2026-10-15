@@ -131,6 +131,19 @@ export const api = {
   getPendingCall: () => apiClient.get(ENDPOINTS.voicePendingCall),
 
   getVoiceCallDetail: (callId) => apiClient.get(ENDPOINTS.voiceCallDetail(callId)),
+
+  getGuardianSettings: () => apiClient.get(ENDPOINTS.guardianSettings),
+
+  updateGuardianSettings: (enabled) =>
+    apiClient.put(ENDPOINTS.guardianSettings, { enabled }),
+
+  getGuardianContacts: () => apiClient.get(ENDPOINTS.guardianContacts),
+
+  addGuardianContact: (email) =>
+    apiClient.post(ENDPOINTS.guardianContacts, { email }),
+
+  removeGuardianContact: (contactId) =>
+    apiClient.delete(ENDPOINTS.guardianContact(contactId)),
 };
 
 

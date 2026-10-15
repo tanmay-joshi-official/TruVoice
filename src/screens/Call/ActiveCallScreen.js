@@ -13,6 +13,12 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+let Speech = null;
+try {
+  Speech = require('expo-speech');
+} catch (error) {
+  console.warn('Spoken warnings are unavailable in this app build:', error.message);
+}
 import Animated, {
   useSharedValue,
   useAnimatedStyle,
@@ -35,6 +41,7 @@ import { useVoiceAnalysis } from '../../hooks/useVoiceAnalysis';
 import { agoraService } from '../../services/agora/agoraService';
 import { api } from '../../services/api/client';
 import { getRiskScoreColor } from '../../utils/scoreColors';
+import { useSettingsStore } from '../../store/settingsStore';
 
 // Temporary call-only test mode. Change to true only after two-way Agora audio
 // is confirmed working, then re-enable analysis components one at a time.
@@ -107,6 +114,8 @@ export default function ActiveCallScreen({ navigation, route }) {
   const [dtmfText, setDtmfText] = useState('');
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [analysisError, setAnalysisError] = useState('');
+  const elderlyModeEnabled = useSettingsStore((state) => state.elderlyModeEnabled);
+  const setElderlyModeEnabled = useSettingsStore((state) => state.setElderlyModeEnabled);
 
   const transcriptLinesRef = useRef([]);
   const lastAnalysisRef = useRef(null);
@@ -114,6 +123,7 @@ export default function ActiveCallScreen({ navigation, route }) {
   const hasEndedRef = useRef(false);
   const wasCriticalRef = useRef(false);
   const secondsRef = useRef(0);
+  const hasSpokenSevereWarningRef = useRef(false);
 
   const activeCallId = route.params?.callId || useCallStore((s) => s.callId);
   useVoiceAnalysis(ENABLE_AI_ANALYSIS ? activeCallId : null);
@@ -132,6 +142,52 @@ export default function ActiveCallScreen({ navigation, route }) {
 
   const { authenticityScore, aiProbability, confidence, riskLevelLabel, scamCategory, scamIntentScore, unifiedRiskScore, threatType, uiAlert } = aiStore;
   const hasAnalysis = chunkCount > 0;
+  const isSevereRisk =
+    String(realTimeRiskLevel || riskAlert?.riskLevel || riskLevelLabel || '').toUpperCase() ===
+    'SEVERE';
+
+  useEffect(() => {
+    let active = true;
+    api.getGuardianSettings()
+      .then((response) => {
+        if (active) setElderlyModeEnabled(Boolean(response.data?.enabled));
+      })
+      .catch((error) => {
+        console.warn('Unable to load elderly mode setting for this call:', error.message);
+      });
+    return () => {
+      active = false;
+    };
+  }, [activeCallId, setElderlyModeEnabled]);
+
+  useEffect(() => {
+    if (!isSevereRisk) {
+      hasSpokenSevereWarningRef.current = false;
+      return;
+    }
+    if (!elderlyModeEnabled || hasSpokenSevereWarningRef.current) return;
+
+    hasSpokenSevereWarningRef.current = true;
+    try {
+      Speech?.speak?.(
+        'Warning. A severe scam risk has been detected. Do not share personal or financial information.',
+        { rate: 0.9 },
+      );
+    } catch (error) {
+      console.warn('Unable to play spoken severe-risk warning:', error.message);
+    }
+  }, [elderlyModeEnabled, isSevereRisk]);
+
+  useEffect(
+    () => () => {
+      try {
+        Speech?.stop?.();
+      } catch (error) {
+        console.warn('Unable to stop spoken warning:', error.message);
+      }
+    },
+    [],
+  );
 
   const isSavedContact = storeContacts.some(
     (c) =>
@@ -146,6 +202,9 @@ export default function ActiveCallScreen({ navigation, route }) {
     if (hasEndedRef.current) return;
     hasEndedRef.current = true;
     console.log(`[ActiveCallScreen] finishCall triggered. reason=${reason}, callId=${activeCallId}, elapsed=${secondsRef.current}s, agoraChannel=${agoraService.currentChannel}`);
+    try {
+      Speech?.stop?.();
+    } catch (_) {}
     audioProcessorService.stop();
     agoraService.leaveChannel().catch((e) => {
       console.warn('Error leaving Agora call:', e);
@@ -362,7 +421,9 @@ export default function ActiveCallScreen({ navigation, route }) {
             <Ionicons name="lock-closed" size={12} color="#22C55E" style={{ marginRight: 4 }} />
             <Text style={styles.encryptedText}>Encrypted</Text>
           </View>
-          <Text style={styles.timerSmall}>{formatTimer(seconds)}</Text>
+          <Text style={[styles.timerSmall, elderlyModeEnabled && styles.elderlyTimer]}>
+            {formatTimer(seconds)}
+          </Text>
         </View>
 
         <View style={styles.callerCenter}>
@@ -376,8 +437,10 @@ export default function ActiveCallScreen({ navigation, route }) {
             </LinearGradient>
           </View>
 
-          <Text style={styles.callerName}>{contact.name}</Text>
-          <Text style={styles.callerSub}>
+          <Text style={[styles.callerName, elderlyModeEnabled && styles.elderlyCallerName]}>
+            {contact.name}
+          </Text>
+          <Text style={[styles.callerSub, elderlyModeEnabled && styles.elderlyCallerSub]}>
             {contact.number || 'In-app call'} · {formatTimer(seconds)}
             {connectionState === 'connected' ? ' · Connected' : connectionState === 'connecting' ? ' · Connecting...' : ''}
           </Text>
@@ -399,7 +462,7 @@ export default function ActiveCallScreen({ navigation, route }) {
             >
               <Ionicons name={getBubbleIcon()} size={20} color="#FFFFFF" />
               {!analysisStopped && (
-                <Text style={styles.bubbleScore}>
+                <Text style={[styles.bubbleScore, elderlyModeEnabled && styles.elderlyBubbleScore]}>
                   {hasAnalysis ? `${authenticityScore}%` : 'Detecting...'}
                 </Text>
               )}
@@ -412,12 +475,16 @@ export default function ActiveCallScreen({ navigation, route }) {
               <Animated.View
                 entering={FadeIn.duration(200)}
                 exiting={FadeOut.duration(150)}
-                style={styles.analysisCard}
+                style={[styles.analysisCard, elderlyModeEnabled && styles.elderlyAnalysisCard]}
               >
                 {analysisStopped ? (
                   <View style={styles.analysisCardInner}>
-                    <Text style={styles.analysisLabel}>Analysis paused</Text>
-                    <Text style={styles.analysisSubtext}>No audio is being recorded</Text>
+                    <Text style={[styles.analysisLabel, elderlyModeEnabled && styles.elderlyAnalysisLabel]}>
+                      Analysis paused
+                    </Text>
+                    <Text style={[styles.analysisSubtext, elderlyModeEnabled && styles.elderlyAnalysisLabel]}>
+                      No audio is being recorded
+                    </Text>
                     <TouchableOpacity
                       onPress={handleResumeAnalysis}
                       style={styles.resumeBtn}
@@ -428,29 +495,37 @@ export default function ActiveCallScreen({ navigation, route }) {
                 ) : (
                   <View style={styles.analysisCardInner}>
                     <View style={styles.analysisRow}>
-                      <Text style={styles.analysisLabel}>Scam Intent</Text>
-                      <Text style={[styles.analysisValue, { color: getBubbleColor() }]}>
-                        {hasAnalysis ? `${authenticityScore}%` : 'Detecting...'}
+                      <Text style={[styles.analysisLabel, elderlyModeEnabled && styles.elderlyAnalysisLabel]}>
+                        Scam Intent
+                      </Text>
+                      <Text style={[styles.analysisValue, elderlyModeEnabled && styles.elderlyAnalysisValue, { color: getRiskScoreColor(scamIntentScore) }]}>
+                        {hasAnalysis ? `${scamIntentScore}%` : 'Detecting...'}
                       </Text>
                     </View>
                     <View style={styles.analysisRow}>
-                      <Text style={styles.analysisLabel}>AI voice</Text>
-                      <Text style={[styles.analysisValue, { color: getRiskScoreColor(aiProbability) }]}>
+                      <Text style={[styles.analysisLabel, elderlyModeEnabled && styles.elderlyAnalysisLabel]}>
+                        AI voice
+                      </Text>
+                      <Text style={[styles.analysisValue, elderlyModeEnabled && styles.elderlyAnalysisValue, { color: getRiskScoreColor(aiProbability) }]}>
                         {hasAnalysis ? `${aiProbability}%` : 'Detecting...'}
                       </Text>
                     </View>
                     <View style={styles.analysisRow}>
-                      <Text style={styles.analysisLabel}>Overall risk</Text>
-                      <Text style={[styles.analysisValue, { color: getRiskScoreColor(unifiedRiskScore) }]}>
+                      <Text style={[styles.analysisLabel, elderlyModeEnabled && styles.elderlyAnalysisLabel]}>
+                        Overall risk
+                      </Text>
+                      <Text style={[styles.analysisValue, elderlyModeEnabled && styles.elderlyAnalysisValue, { color: getRiskScoreColor(unifiedRiskScore) }]}>
                         {hasAnalysis ? `${unifiedRiskScore}%` : 'Detecting...'}
                       </Text>
                     </View>
                     {hasAnalysis && riskLevelLabel ? (
                       <View style={styles.analysisRow}>
-                        <Text style={styles.analysisLabel}>Risk level</Text>
+                        <Text style={[styles.analysisLabel, elderlyModeEnabled && styles.elderlyAnalysisLabel]}>
+                          Risk level
+                        </Text>
                         <Text style={[styles.analysisValue, {
                           color: getRiskScoreColor(unifiedRiskScore),
-                          fontSize: 12,
+                          fontSize: elderlyModeEnabled ? 18 : 12,
                         }]}>
                           {riskLevelLabel}
                         </Text>
@@ -458,10 +533,12 @@ export default function ActiveCallScreen({ navigation, route }) {
                     ) : null}
                     {threatType && threatType !== 'NORMAL' ? (
                       <View style={styles.analysisRow}>
-                        <Text style={styles.analysisLabel}>Threat</Text>
+                        <Text style={[styles.analysisLabel, elderlyModeEnabled && styles.elderlyAnalysisLabel]}>
+                          Threat
+                        </Text>
                         <Text style={[styles.analysisValue, {
                           color: threatType === 'AI_CLONE_SCAM' ? '#DC2626' : '#F59E0B',
-                          fontSize: 11,
+                          fontSize: elderlyModeEnabled ? 17 : 11,
                         }]}>
                           {threatType.replace(/_/g, ' ')}
                         </Text>
@@ -475,7 +552,7 @@ export default function ActiveCallScreen({ navigation, route }) {
                           color={threatType === 'AI_CLONE_SCAM' ? '#DC2626' : '#F59E0B'}
                           style={{ marginRight: 6 }}
                         />
-                        <Text style={[styles.uiAlertText, {
+                        <Text style={[styles.uiAlertText, elderlyModeEnabled && styles.elderlyWarningText, {
                           color: threatType === 'AI_CLONE_SCAM' ? '#FCA5A5' : '#FDE68A',
                         }]}>
                           {uiAlert}
@@ -514,7 +591,11 @@ export default function ActiveCallScreen({ navigation, route }) {
             style={[styles.controlBtn, isMuted && styles.controlBtnActive]}
           >
             <Ionicons name={isMuted ? 'mic-off' : 'mic'} size={24} color={isMuted ? '#EF4444' : '#FFFFFF'} />
-            <Text style={[styles.controlLabel, isMuted && { color: '#EF4444' }]}>
+            <Text style={[
+              styles.controlLabel,
+              elderlyModeEnabled && styles.elderlyControlLabel,
+              isMuted && { color: '#EF4444' },
+            ]}>
               {isMuted ? 'Muted' : 'Mute'}
             </Text>
           </TouchableOpacity>
@@ -525,7 +606,9 @@ export default function ActiveCallScreen({ navigation, route }) {
             style={[styles.controlBtn, isSpeaker && styles.controlBtnActive]}
           >
             <Ionicons name={isSpeaker ? 'volume-high' : 'volume-medium-outline'} size={24} color="#FFFFFF" />
-            <Text style={styles.controlLabel}>Speaker</Text>
+            <Text style={[styles.controlLabel, elderlyModeEnabled && styles.elderlyControlLabel]}>
+              Speaker
+            </Text>
           </TouchableOpacity>
 
           <TouchableOpacity
@@ -534,7 +617,9 @@ export default function ActiveCallScreen({ navigation, route }) {
             style={[styles.controlBtn, showKeypad && styles.controlBtnActive]}
           >
             <Ionicons name="keypad-outline" size={24} color="#FFFFFF" />
-            <Text style={styles.controlLabel}>Keypad</Text>
+            <Text style={[styles.controlLabel, elderlyModeEnabled && styles.elderlyControlLabel]}>
+              Keypad
+            </Text>
           </TouchableOpacity>
 
           <TouchableOpacity
@@ -550,14 +635,21 @@ export default function ActiveCallScreen({ navigation, route }) {
             style={styles.controlBtn}
           >
             <Ionicons name="person-add-outline" size={24} color="#FFFFFF" />
-            <Text style={styles.controlLabel}>Add</Text>
+            <Text style={[styles.controlLabel, elderlyModeEnabled && styles.elderlyControlLabel]}>
+              Add
+            </Text>
           </TouchableOpacity>
         </View>
 
         {showKeypad && (
           <View style={styles.keypadOverlay}>
             <View style={styles.keypadOverlayHeader}>
-              <Text style={styles.keypadOverlayTitle}>Keypad: {dtmfText}</Text>
+              <Text style={[
+                styles.keypadOverlayTitle,
+                elderlyModeEnabled && styles.elderlyKeypadTitle,
+              ]}>
+                Keypad: {dtmfText}
+              </Text>
               <TouchableOpacity onPress={() => setShowKeypad(false)} style={styles.keypadCloseBtn}>
                 <Ionicons name="close-circle" size={24} color="#FFFFFF" />
               </TouchableOpacity>
@@ -624,6 +716,9 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '600',
   },
+  elderlyTimer: {
+    fontSize: 21,
+  },
   callerCenter: {
     alignItems: 'center',
     marginTop: -20,
@@ -659,10 +754,19 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     letterSpacing: -0.5,
   },
+  elderlyCallerName: {
+    fontSize: 36,
+    letterSpacing: 0,
+  },
   callerSub: {
     color: colors.textSecondary,
     fontSize: 14,
     marginTop: 4,
+  },
+  elderlyCallerSub: {
+    fontSize: 18,
+    lineHeight: 26,
+    textAlign: 'center',
   },
   savedBadge: {
     flexDirection: 'row',
@@ -708,6 +812,9 @@ const styles = StyleSheet.create({
     marginTop: 1,
     flexShrink: 0,
   },
+  elderlyBubbleScore: {
+    fontSize: 14,
+  },
   bubbleSpinner: {
     position: 'absolute',
     top: 2,
@@ -732,6 +839,9 @@ const styles = StyleSheet.create({
     shadowRadius: 12,
     elevation: 12,
   },
+  elderlyAnalysisCard: {
+    width: 290,
+  },
   analysisCardInner: {
     padding: 14,
   },
@@ -750,6 +860,13 @@ const styles = StyleSheet.create({
     color: '#FFFFFF',
     fontSize: 14,
     fontWeight: '700',
+  },
+  elderlyAnalysisLabel: {
+    fontSize: 16,
+    lineHeight: 22,
+  },
+  elderlyAnalysisValue: {
+    fontSize: 19,
   },
   analysisSubtext: {
     color: colors.textMuted,
@@ -785,6 +902,10 @@ const styles = StyleSheet.create({
     fontSize: 11,
     fontWeight: '600',
     flex: 1,
+  },
+  elderlyWarningText: {
+    fontSize: 17,
+    lineHeight: 24,
   },
   cardDivider: {
     height: 1,
@@ -838,6 +959,9 @@ const styles = StyleSheet.create({
     position: 'absolute',
     bottom: -20,
   },
+  elderlyControlLabel: {
+    fontSize: 14,
+  },
   endCallArea: {
     alignItems: 'center',
     paddingTop: 16,
@@ -878,6 +1002,9 @@ const styles = StyleSheet.create({
     color: '#FFFFFF',
     fontSize: 18,
     fontWeight: '700',
+  },
+  elderlyKeypadTitle: {
+    fontSize: 22,
   },
   keypadCloseBtn: {
     padding: 4,
