@@ -16,7 +16,10 @@
       "supportsTablet": true,
       "infoPlist": {
         "NSMicrophoneUsageDescription": "TruVoice needs microphone access for voice calls and real-time scam detection.",
-        "UIBackgroundModes": ["audio", "voip"]
+        "UIBackgroundModes": [
+          "audio",
+          "voip"
+        ]
       }
     },
     "android": {
@@ -39,10 +42,11 @@
       "expo-font"
     ],
     "extra": {
-      "apiUrl": "${EXPO_PUBLIC_API_URL}",
+      "apiUrl": "${process.env.EXPO_PUBLIC_API_URL}",
       "eas": {
-        "projectId": "ad84f836-5feb-48ea-a61a-8ffeff4ab5bc"
-      }
+        "projectId": "53c2bbbc-b4b1-4b96-8c07-92cf97285ba6"
+      },
+      "agoraAppId": "${process.env.EXPO_PUBLIC_AGORA_APP_ID}"
     }
   }
 }

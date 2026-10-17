@@ -8,6 +8,8 @@
   <img src="https://img.shields.io/badge/React%20Native-Mobile-blue?logo=react" />
   <img src="https://img.shields.io/badge/FastAPI-Backend-009688?logo=fastapi" />
   <img src="https://img.shields.io/badge/Python-AI-yellow?logo=python" />
+  <img src="https://img.shields.io/badge/PyTorch-Deep%20Learning-red?logo=pytorch" />
+  <img src="https://img.shields.io/badge/Hugging%20Face-Wav2Vec2-orange?logo=huggingface" />
   <img src="https://img.shields.io/badge/WebSocket-Real--Time-orange" />
   <img src="https://img.shields.io/badge/Expo-Cross%20Platform-black?logo=expo" />
   <img src="https://img.shields.io/badge/License-MIT-green" />
@@ -19,7 +21,7 @@
 
 **TruVoice** is an AI-powered mobile application that detects **AI-generated, cloned, and manipulated voices in real time** during phone conversations.
 
-With the rapid rise of voice cloning technologies, distinguishing between genuine and synthetic voices has become increasingly difficult. TruVoice continuously analyzes live audio streams using machine learning and digital signal processing to provide users with an instant trust score, helping them identify potential scams before they become victims.
+With the rapid rise of voice cloning technologies, distinguishing between genuine and synthetic voices has become increasingly difficult. TruVoice continuously analyzes live audio streams using **Wav2Vec2**, deep learning, and digital signal processing to provide users with an instant trust score, helping them identify potential scams before they become victims.
 
 ---
 
@@ -90,11 +92,13 @@ Audio Chunking
 (5-second windows)
       │
       ▼
-Feature Extraction
-(MFCC, Spectral Features)
+Audio Preprocessing
       │
       ▼
-LightGBM AI Model
+Wav2Vec2 Feature Extraction
+      │
+      ▼
+Wav2Vec2 Deep Learning Model
       │
       ▼
 AI Confidence Score
@@ -119,15 +123,13 @@ C-->D[FastAPI Backend]
 
 D-->E[Audio Processing]
 
-E-->F[Feature Extraction]
+E-->F[Wav2Vec2 Model]
 
-F-->G[LightGBM Model]
+F-->G[Prediction]
 
-G-->H[Prediction]
+G-->H[Trust Score]
 
-H-->I[Trust Score]
-
-I-->A
+H-->A
 ```
 
 ---
@@ -168,9 +170,9 @@ I-->D
 | **Styling** | NativeWind, Tailwind CSS |
 | **Backend** | FastAPI, Python |
 | **Communication** | WebSockets |
-| **Machine Learning** | LightGBM |
-| **Audio Processing** | Librosa, NumPy |
-| **Model Serialization** | Joblib |
+| **Machine Learning** | Wav2Vec2 |
+| **Deep Learning** | PyTorch, Hugging Face Transformers |
+| **Audio Processing** | Librosa, NumPy, Torchaudio |
 | **Authentication** | JWT |
 | **API Server** | Uvicorn |
 
@@ -207,7 +209,7 @@ TruVoice/
 ## Clone Repository
 
 ```bash
-git clone https://github.com/yourusername/TruVoice.git
+git clone https://github.com/tanmay-joshi-official/TruVoice.git
 
 cd TruVoice
 ```
@@ -279,25 +281,17 @@ A[Audio Input]
 
 A-->B[Noise Handling]
 
-B-->C[Feature Extraction]
+B-->C[Audio Preprocessing]
 
-C-->D[MFCC]
+C-->D[Wav2Vec2]
 
-C-->E[Spectral Centroid]
+D-->E[Deep Audio Embeddings]
 
-C-->F[Zero Crossing Rate]
+E-->F[Classification Head]
 
-D-->G[Feature Vector]
+F-->G[AI Probability]
 
-E-->G
-
-F-->G
-
-G-->H[LightGBM]
-
-H-->I[AI Probability]
-
-I-->J[Trust Score]
+G-->H[Trust Score]
 ```
 
 ---
@@ -306,9 +300,9 @@ I-->J[Trust Score]
 
 ✅ Real-time AI voice scam detection
 
-✅ Low latency streaming
+✅ Wav2Vec2 deep learning powered
 
-✅ Machine learning powered
+✅ Low latency streaming
 
 ✅ Mobile-first experience
 
@@ -326,8 +320,12 @@ I-->J[Trust Score]
 - Expo
 - FastAPI
 - Python
-- LightGBM
+- PyTorch
+- Hugging Face Transformers
+- Wav2Vec2
+- Torchaudio
 - Librosa
+- NumPy
 - WebSockets
 - NativeWind
 - Tailwind CSS
